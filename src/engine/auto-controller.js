@@ -26,6 +26,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
   let starting = false;
   let busy = false;
   let manualContext = null;
+  let readyHold=false;
   let queued = false;
   let planQueued = false;
   const settingsProtected=new Set(), transactionKeeps=new Set();
@@ -75,7 +76,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
   }
   function stop(reason = '已手动停止') {
     const wasLive = running || starting;
-    running = false;
+    running = false;readyHold=false;
     starting = false;
     generation++;
     pineconePending = false; packagingSalePending=false;packagingPending=false;
@@ -174,7 +175,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     });
   }
   function schedule() {
-    if (!running || busy || queued || manualContext) return;
+    if (!running || busy || queued || manualContext || readyHold) return;
     queued = true;
     queueMicrotask(() => {
       queued = false;
@@ -724,7 +725,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
   }
 
   async function step() {
-    if (!running || busy || manualContext) return;
+    if (!running || busy || manualContext || readyHold) return;
     busy = true;transactionKeeps.clear();
     for(const base of keepBases(getPlan(),chess))transactionKeeps.add(base);
     let again = false;
@@ -839,6 +840,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
         .filter(unit=>!soldEarly.has(unit.uid) && current.unitByUid.has(unit.uid));
       const quotaGifts=new Set(candidate.id===FLAMETAIL_ID ?
         [...audit.gifts.map(gift=>gift.uid),...(promotion ? [promotion.unit.uid] : [])] : []);
+      if(candidate.surplusKeep===true)quotaGifts.add(audit.parent.uid);
       function retainQueued(snap,unit){
         const plan=getPlan(), protectedBases=new Set([...keep,...transactionKeeps,...keepBases(plan,chess)]);
         if(quotaGifts.has(unit.uid) && protectedBases.has(unit.base))
@@ -973,6 +975,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
   }
 
   async function start() {
+    if(readyHold){report('blocked','自动准备条件已满足，正在等待交接');return false;}
     if (manualContext) { report('blocked','手动操作尚未核对完成，请稍后再开启倒转'); return false; }
     if (running || starting || busy) { report('blocked', '上一笔尚未结束，请稍后再启动'); return false; }
     settingsProtected.clear();transactionKeeps.clear();
@@ -1095,7 +1098,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     finally{clearTimeout(ticket.expiry);if(manualContext===ticket)manualContext=null;releaseIfIdle();if(running)schedule();}
   }
 
-  return { start, stop, beginManual, completeManual, get manualPending(){return !!manualContext;}, updatePlan() {
+  return { start, stop, beginManual, completeManual, holdForReady(){readyHold=true;}, releaseReadyHold(){readyHold=false;schedule();}, get manualPending(){return !!manualContext;}, updatePlan() {
     if(!running)return;
     const keep=keepBases(getPlan(),chess), snap=inspectMatch(read(),chess,{allowReward:allowReward()});
     if(snap.ok)for(const unit of snap.units)if(keep.has(unit.base))settingsProtected.add(unit.uid);

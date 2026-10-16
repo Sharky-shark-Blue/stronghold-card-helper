@@ -1,3 +1,4 @@
+import { canReverseFullKeep } from './flametail-flow.js';
 import { auditFlametailPurchase } from './flametail-audit.js';
 import { sameUnitWithPlacement } from './placement.js';
 import { auditOrdinaryPurchase, planRetainedMerge } from './trade-audit.js';
@@ -101,10 +102,10 @@ export function pickCandidate(ctx, plan, chess) {
     const rec = chess[id];
     const base = baseId(id, chess);
     if (!base) continue;
-    // User-confirmed priority: an active keep rule owns its operator. When its funds gate
-    // is unmet or its current holding target is met, the operator is not bought at all — the
-    // ordinary buy list and the cheap (price 0/1) path cannot buy it either.
-    if (blocked.has(base)) continue;
+    // Below target: keep priority. At target: only a fresh ordinary purchase may reverse.
+    // An unmet funds gate and purchases that would merge old UIDs remain blocked.
+    const surplusKeep=blocked.has(base) && canReverseFullKeep(ctx,base,plan.keepRules?.[base]);
+    if (blocked.has(base) && !surplusKeep) continue;
     const retain = keep.has(base);
     if (retain && !keepRuleAllows(ctx, base, plan.keepRules?.[base], offer.golden === true || rec.isGolden === true ? 3 : 1)) continue;
     if (!retain && excluded.has(base)) continue; // A disabled buy rule never overrides an active keep rule.
@@ -126,7 +127,7 @@ export function pickCandidate(ctx, plan, chess) {
       // Its new elite can be sold subject to keep targets; other old UID changes fail closed.
     }
     found.push({ slot, id, base, price: offer.price, reason: retain ? '保留' : customBuy ? '自定义' : '低价',
-      priority: retain ? 0 : customBuy ? 1 : 2, ...(keepMerge ? {keepMerge} : {}) });
+      priority: retain ? 0 : customBuy ? 1 : 2, ...(surplusKeep ? {surplusKeep:true} : {}), ...(keepMerge ? {keepMerge} : {}) });
   }
   found.sort((a, b) => a.priority - b.priority || a.slot - b.slot);
   return found[0] || null;
@@ -292,7 +293,7 @@ export function pickCoinTarget(ctx, preferUids = []) {
 }
 
 export function auditPurchase(before, after, candidate, plan, chess) {
-  const retain=keepBases(plan,chess).has(candidate.base);
+  const retain=keepBases(plan,chess).has(candidate.base) && candidate.surplusKeep!==true;
   if(candidate.id===FLAMETAIL_ID){
     const checked=auditFlametailPurchase(before,after,candidate,{chess});
     return checked.ok ? {...checked,retain} : checked;

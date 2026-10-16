@@ -1,11 +1,13 @@
 // Independent endless-mode ready scheduler. Never arms on load or retries an uncertain round.
-export function createAutoReady({read,getOptions,available,tradeBusy,handoff,acquireLock,prepare,claim,audit,onStatus}) {
+export function createAutoReady({read,getOptions,available,tradeBusy,handoff,acquireLock,prepare,claim,audit,onStatus,hold=()=>{},unhold=()=>{}}) {
   let running=false,busy=false,generation=0,timer=null,owner='',stable='',stableAt=0,lastMessage='已关闭';
+  let holding=false;
+  const releaseHold=()=>{if(holding){holding=false;unhold();}};
   const attempted=new Set();
   const who=s=>`${s?.room?.code || ''}|${s?.me?.playerId || ''}`;
   function report(message){lastMessage=message;onStatus?.({readyRunning:running,readyBusy:busy,readyMessage:message});}
   function stop(message='已关闭自动准备；已发出的准备指令仍可能生效'){
-    running=false;generation++;clearInterval(timer);timer=null;stable='';report(message);
+    releaseHold();running=false;generation++;clearInterval(timer);timer=null;stable='';report(message);
   }
   function valid(s){return s?.connection?.status==='online' && !s?.ui?.buildStale && s?.readySupported===true &&
     s?.match?.private?.alive===true && s?.room?.inMatch===true && typeof s.room.code==='string' && typeof s?.me?.playerId==='string' &&
@@ -19,17 +21,19 @@ export function createAutoReady({read,getOptions,available,tradeBusy,handoff,acq
       const s=read();
       if(!available() || !valid(s) || who(s)!==owner){stop('自动准备已停止：连接、自检、座位或对局状态变化');return;}
       const p=s.match.private,pub=s.match.public,o=getOptions();
-      if(o.confirmed===false){stable='';report('等待准备设置保存');return;}
-      if(pub.phase!=='PREP'){stable='';report('等待下一次整备');return;}
+      if(o.confirmed===false){releaseHold();stable='';report('等待准备设置保存');return;}
+      if(pub.phase!=='PREP'){releaseHold();stable='';report('等待下一次整备');return;}
       if(!Number.isSafeInteger(pub.round) || pub.round<1 || !Number.isSafeInteger(p.funds) || p.funds<0){stop('回合或资金状态无效，自动准备已停止');return;}
-      if(p.ready===true){report('本回合已准备，等待下一回合');return;}
+      if(p.ready===true){releaseHold();report('本回合已准备，等待下一回合');return;}
       if(p.ready!==false){stop('准备状态不明确，自动准备已停止');return;}
-      if(o.skipTenth && pub.round%10===0){stable='';report(`第 ${pub.round} 回合跳过，等待你手动准备`);return;}
-      if(o.funds!==null && p.funds>o.funds){stable='';report(`等待资金 ≤ ${o.funds}（当前 ${p.funds}）`);return;}
-      if(p.shop?.rewardOffer?.slots?.length || !Array.isArray(p.temp) || p.temp.length){stable='';report('等待处理奖励或临时区');return;}
+      if(o.skipTenth && pub.round%10===0){releaseHold();stable='';report(`第 ${pub.round} 回合跳过，等待你手动准备`);return;}
+      if(o.funds!==null && p.funds>o.funds){releaseHold();stable='';report(`等待资金 ≤ ${o.funds}（当前 ${p.funds}）`);return;}
+      holding=true;hold();
+      if(p.shop?.rewardOffer?.slots?.length || !Array.isArray(p.temp) || p.temp.some(Boolean)){stable='';report('等待处理奖励或临时区');return;}
+      if(p.canReady===false){stable='';report('等待处理本回合的准备条件');return;}
       if(tradeBusy()){stable='';report('等待在途交易核对完成');return;}
       const identity=`${owner}|${pub.round}`,key=`${o.epoch}|${identity}`,stamp=JSON.stringify(p),quiet=key+'|'+stamp+'|'+JSON.stringify([o.funds,o.skipTenth]);
-      if(attempted.has(key)){report('本回合已尝试准备，不重复发送');return;}
+      if(attempted.has(key)){releaseHold();report('本回合已尝试准备，不重复发送');return;}
       if(stable!==quiet){stable=quiet;stableAt=Date.now();report('条件已满足，等待状态稳定');return;}
       if(Date.now()-stableAt<750)return;
       busy=true;report('正在核对并提交准备');

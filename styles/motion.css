@@ -29,3 +29,5 @@
 .workbench.workflow #ready-funds{width:90px;padding:6px 8px;min-width:0;border:1px solid var(--v-line-2);border-radius:6px;background:var(--v-sunken);color:var(--v-text);font:inherit}
 .workbench.workflow .auto-ready-settings .density-line{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:7px 0}
 .workbench.workflow .auto-ready-settings p{font-size:10px;line-height:1.6;color:var(--v-faint);margin:5px 0}
+
+.round-trades{font-size:11px;line-height:1.65;font-variant-numeric:tabular-nums;color:var(--foreground,#d9c8d3);margin:8px 0;overflow-wrap:anywhere}

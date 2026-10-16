@@ -98,7 +98,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       Model.ITEMS.map(item => item.id),gameItems);
     let loadedVersion='不可用',extensionId='不可用';try{loadedVersion=chrome.runtime.getManifest().version;extensionId=chrome.runtime.id.slice(-8);}catch{}
     const randomAvailable=typeof globalThis.crypto?.getRandomValues==='function';
-    return {...live,...readyLive,autoReady:plan.autoReady,readyReady:!!readyController&&auditReady&&!healthError&&state?.readySupported===true,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
+    return {...live,...readyLive,roundStats:state?.roundStats || null,autoReady:plan.autoReady,readyReady:!!readyController&&auditReady&&!healthError&&state?.readySupported===true,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
       eligible:check.ok,eligibility:check.reason || '本人整备期，可手动启动',matches:mapping.matches,keepCounts,itemOwnedCounts,itemMatches:mapping.itemMatches,useNotes:mapping.useNotes,pending:mapping.pending,issues:mapping.issues,skipped:mapping.skipped,
       health:[`脚本 v${BUILD_VERSION} · 已加载扩展 v${loadedVersion} / ${extensionId} · 服务器 ${location.host}`,`安全随机字节 ${randomAvailable ? '可用' : '不可用，拒绝交易'} · ${isSecureContext ? '安全上下文' : '普通 HTTP 上下文'}`,healthError || (transport ? '网页桥接与扩展后台已连接' : '未连接网页交易接口'),auditReady ? '审计日志可用；运行锁在手动启动时获取' : '审计日志尚未就绪',(garrisons ? '特质图鉴已读取' : '特质图鉴不可用：赠币外的免费奖励需手动选择'),gameItems ? '本服道具数据已读取，可按唯一名称识别图鉴外道具' : '本服道具数据不可用：图鉴外道具维持待识别，已知静态 ID 仍需商店精确匹配',check.reason || '本人整备、库存与 UID 可核对',mapping.issues.length ? mapping.issues.join('；') : mapping.pending.length ? `待识别 ${mapping.pending.length} 项，仅这些条目不自动交易；${mapping.skipped.slice(0,3).join('；')}${mapping.pending.length>3?'；其余见名单':''}` : '已启用的名单可按本服图鉴匹配'],
       gameKeys:gameKeys(),logCount:auditLog?.entries.length || 0,entries:(auditLog?.entries || []).slice(-60)};
@@ -359,6 +359,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       readyController=createAutoReady({read:transport.read,
         getOptions:()=>({...plan.autoReady,epoch:plan.itemSession.epoch,confirmed:readySettingsStamp===JSON.stringify(plan.autoReady)}),
         available:()=>!closed&&uiReady&&auditReady&&!healthError&&!matchSyncPending&&chrome.runtime.getManifest().version===BUILD_VERSION,
+        hold:()=>controller?.holdForReady(),unhold:()=>controller?.releaseReadyHold(),
         tradeBusy:()=>!!(controller?.busy||controller?.starting||controller?.manualPending),
         handoff:()=>controller?.stop('自动准备条件已满足，停止倒转并等待准备'),
         acquireLock:transport.acquireLock,prepare:transport.prepare,

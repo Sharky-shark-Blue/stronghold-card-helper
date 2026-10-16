@@ -86,6 +86,7 @@
     if (!chess?.[FLAME] || !chess['chess_char_1_19_a'] || Object.keys(chess).length < 20) {
       throw new Error('角色图鉴不兼容，停止注入');
     }
+    const roundTrades=createRoundTradeStats({read:()=>store.get(),onChange:()=>send('snapshot',{state:view()})});
     const base = id => typeof id === 'string' && chess[id] ? (typeof chess[id].baseId === 'string' && chess[chess[id].baseId] ? chess[id].baseId : id) : null;
     // Independent copy of item-policy.js itemMergeRule: mirrors the server's _itemMergeable.
     const itemRecord = id => itemData && typeof id === 'string' && Object.hasOwn(itemData, id) &&
@@ -113,7 +114,7 @@
       const s = raw || store.get();
       const room = s?.room, pub = s?.match?.public, p = s?.match?.private;
       return {
-        readySupported:typeof actions.ready==='function',manualSupported,
+        readySupported:typeof actions.ready==='function',manualSupported,roundStats:roundTrades.read(),
         connection: { status: s?.connection?.status }, ui: { buildStale: s?.ui?.buildStale === true },
         me: { playerId: s?.me?.playerId },
         room: room ? { code: room.code, inMatch: room.inMatch,
@@ -121,7 +122,7 @@
         match: {
           public: pub ? { phase: pub.phase, round: pub.round,
             players: Array.isArray(pub.players) ? pub.players.map(x => ({ playerId: x?.playerId, autoplay: x.autoplay })) : null } : null,
-          private: p ? { alive: p.alive, ready: p.ready, funds: p.funds,
+          private: p ? { alive: p.alive, ready: p.ready, canReady:p.canReady, funds: p.funds,
             diy: diyPicks(p.diy),
             hand: Array.isArray(p.hand) ? p.hand.map(piece) : null,
             board: Array.isArray(p.board) ? p.board.map(piece) : null,
@@ -297,7 +298,8 @@
       if (!rec || !idBase) throw new Error('干员 ID 不在本服务器图鉴中');
       const keep = bases(message.keep);
       const selected = bases(message.buy);
-      const retained = keep.has(idBase);
+      const surplusKeep=keep.has(idBase) && canReverseFullKeep({ownedCopies:ctx.ownedCopies,funds:ctx.p.funds},idBase,message.keepRules?.[idBase]);
+      const retained = keep.has(idBase) && !surplusKeep;
       if (retained) assertKeepRule(message.keepRules?.[idBase], ctx, idBase, offer);
       if (!retained && bases(message.excludedBuy).has(idBase)) throw new Error('此干员买入规则已禁用');
       const ordinary = rec.isGolden !== true && rec.visible === true && rec.isHidden !== true && rec.isDiy !== true;
@@ -358,8 +360,8 @@
       }
       const quotaGifts=new Set(flametailAudit?.gifts.map(unit=>unit.uid) || []);
       for (const [uid, unit] of fresh) ledger.set(uid, { ...unit, identity: ctx.identity,
-        surplusGift:quotaGifts.has(uid),
-        protected: (!quotaGifts.has(uid) && keep.has(unit.base)) || placementProtected.has(uid) || unit.area==='board' });
+        surplusGift:quotaGifts.has(uid) || surplusKeep && unit.base===idBase,
+        protected: (!quotaGifts.has(uid) && !(surplusKeep && unit.base===idBase) && keep.has(unit.base)) || placementProtected.has(uid) || unit.area==='board' });
       return { count: fresh.length };
     }
     // Item purchases never enter the chess sale ledger. Both worlds check the
@@ -709,13 +711,13 @@
       if(ctx.identity!==message.identity || JSON.stringify(view().match.private)!==message.stamp ||
         !(message.maximumFunds===null || Number.isSafeInteger(message.maximumFunds)&&message.maximumFunds>=0) ||
         typeof message.skipTenth!=='boolean' || message.maximumFunds!==null && ctx.p.funds>message.maximumFunds ||
-        message.skipTenth && round%10===0 || !Number.isInteger(round) || round<1 || ctx.p.temp.length || pendingReward)
+        message.skipTenth && round%10===0 || !Number.isInteger(round) || round<1 || ctx.p.temp.some(Boolean) || ctx.p.canReady===false || pendingReward)
         throw new Error('准备前身份、资金、回合、奖励或库存变化；未发送准备');
       if(preparedRounds.has(ctx.identity))throw new Error('本回合准备已尝试，不重复发送');
       preparedRounds.add(ctx.identity);if(preparedRounds.size>128)preparedRounds.delete(preparedRounds.values().next().value);
       if(await actions.ready(true)!==true)throw new Error('准备请求未确认，可能已生效；不重试');
       const confirmed=await waitFor(raw=>raw?.room?.code===s.room.code && raw?.me?.playerId===s.me.playerId &&
-        (raw?.match?.private?.ready===true || ['BATTLE','POST'].includes(raw?.match?.public?.phase)));
+        (raw?.match?.private?.ready===true || ['COMBAT','SETTLE','BATTLE','POST'].includes(raw?.match?.public?.phase)));
       if(!confirmed)throw new Error('准备回执已收到，但状态未确认；不重试');
       return {prepared:true};
     }
@@ -781,12 +783,13 @@
         throw error;
       }finally{manualInFlight=false;manualMonitor=false;}
     }
-    let nativeNet=null,originalRequest=null,nativeHook=null;
+    let nativeNet=null,originalRequest=null,requestBeforeHook=null,nativeHook=null;
     try{
       nativeNet=sp?.net || (await import(new URL('js/net.js',root))).net;
       if(disposed)return;
       if(!nativeNet || typeof nativeNet.request!=='function')throw new Error('未找到原生请求接口');
-      originalRequest=nativeNet.request;
+      requestBeforeHook=nativeNet.request;
+      originalRequest=function(type,fields={},...extra){return roundTrades.track(type,fields,()=>requestBeforeHook.call(this,type,fields,...extra));};
       nativeHook=function(type,fields={},...extra){
         // Own intent is marked only during the synchronous call into actions/net.request.
         // A long-lived async flag would accidentally hide concurrent native clicks.
@@ -805,10 +808,10 @@
       };
       nativeNet.request=nativeHook;
       if(nativeNet.request!==nativeHook)throw new Error('原生请求接口不可监测');
-      manualSupported=true;
+      manualSupported=true;roundTrades.setCountsSupported(true);
       restoreManual=()=>{
         manualEnabled=false;manualSupported=false;
-        if(nativeNet.request===nativeHook)nativeNet.request=originalRequest;
+        if(nativeNet.request===nativeHook)nativeNet.request=requestBeforeHook;
         for(const waiter of [...manualWaiters.values()])waiter.finish({ok:false,reason:'工作台已关闭，未确认请求不会重试'});
       };
     }catch(error){manualSupported=false;console.warn('[wei] 手动操作协调不可用，仍保留未知变化停机保护',error);}
@@ -836,6 +839,7 @@
     window.addEventListener('message', handleMessage);
     observePlacement();
     offStore = store.subscribe(raw => {
+      roundTrades.observe(raw);
       observePlacement();
       // Any manual selection/changed offer burns its typed, one-use proof, even
       // if a later unrelated offer happens to show exactly the same cards.

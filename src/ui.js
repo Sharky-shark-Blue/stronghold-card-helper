@@ -159,7 +159,7 @@ export async function mountWorkbench(container, options) {
         <label class="search">${icon('search')}<span class="sr-only">搜索已添加的道具</span><input id="item-search" type="search" maxlength="80" autocomplete="off" placeholder="搜索已添加的道具"></label>
         <div class="list-heading"><span>已添加 <b id="item-count">0 件</b></span><span id="item-enabled-summary">新增默认禁用 · 点启用后自动买入</span><span class="list-view-modes"><button class="density-toggle" type="button" data-action="compact" aria-pressed="false" title="紧凑列表：减少行高，同屏显示更多条目">紧凑</button><button class="density-toggle" type="button" data-action="icons" aria-pressed="false" aria-controls="item-list" title="仅图标：点击切换自动购买，双右键同样有效；拖到任意网格">仅图标</button></span><span id="item-icon-mode-help" class="sr-only">点击或双右键切换自动购买；自动使用仍按原设置。拖到任意网格，可留空；占用格向后顺延，也可按 Alt 加方向键移动。累计次数、上限和资金门槛不变。</span></div>
         <div class="item-scroll">
-          <details class="item-help"><summary>规则说明</summary><p>道具逐条点“启用”后才自动购买；抓取上限留空即不限，填了上限的用满会自动禁用，手动再启用会清零道具本局次数。资金门槛填写后要求购买前资金严格大于它。同名装备按游戏数据合成：手牌或整备区已有同名件时，买入即合成精锐并计1次；会用掉干员身上已配发的同名装备时跳过不买。“下一对局”只清零道具累计次数。保留干员不累计购买次数：按战场、手牌/备战区和临时区的当前持有量补足，普通1、精二3；达标暂停，数量减少后自动补抓，手动禁用仍优先。</p></details>
+          <details class="item-help"><summary>规则说明</summary><p>道具逐条点“启用”后才自动购买；抓取上限留空即不限，填了上限的用满会自动禁用，手动再启用会清零道具本局次数。资金门槛填写后要求购买前资金严格大于它。同名装备按游戏数据合成：手牌或整备区已有同名件时，买入即合成精锐并计1次；会用掉干员身上已配发的同名装备时跳过不买。“下一对局”只清零道具累计次数。保留干员不累计购买次数：按战场、手牌/备战区和临时区的当前持有量补足，普通1、精二3；达标后停止补抓，符合倒卖规则的新买入干员仍可倒卖；数量减少后自动补抓，手动禁用仍优先。</p></details>
           <div id="item-list" class="item-list" aria-label="已记录道具"></div>
           <button class="item-next" type="button" data-action="item-next">下一对局 · 清零道具次数</button>
         </div>
@@ -172,6 +172,7 @@ export async function mountWorkbench(container, options) {
       <div id="chips" class="chips" hidden></div>
       <section class="auto-card" aria-label="手动启动自动倒转">
         <div class="auto-header"><div class="auto-title">${icon('bolt')}<strong>自动倒转</strong><span id="runtime-brief" class="runtime-brief">未连接</span><kbd id="hotkey-chip" class="hotkey-chip" title="启停快捷键，可在设置中修改" hidden></kbd></div><button class="run-button" type="button" role="switch" data-action="draft" aria-label="手动启动或停止自动倒转" aria-checked="false"><span class="run-label">启动</span></button></div>
+        <p id="round-trades" class="round-trades" aria-label="本回合交易统计">本回合统计未接入</p>
         <p id="draft-note">自动交易未启动。</p><p class="auto-risk">买入、刷新无总额上限 · 刷新间隔 ≥0.3秒</p>
       </section>
       <div class="feedback-slot" data-feedback-slot="main"><div class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div></div>
@@ -280,9 +281,12 @@ export async function mountWorkbench(container, options) {
     $('.utility-foot [data-action=draft]').hidden=!active;
     $('.utility-foot [data-feedback-default]').textContent=active?'正在运行 · 可在此停止':'工具页只查看，返回名单后手动启动';
     $('#draft-note').textContent = runtimeInfo.message || '自动交易未启动';
-    $('.phase-pill').textContent = options.preview ? '离线预览' : `${({PREP:'整备',BATTLE:'战斗',POST:'结算',LOBBY:'大厅'})[runtimeInfo.phase] || runtimeInfo.phase || '待连接'} · ${active ? '运行中' : '已停止'}`;
+    $('.phase-pill').textContent = options.preview ? '离线预览' : `${({PREP:'整备',COMBAT:'战斗',SETTLE:'结算',BATTLE:'战斗',POST:'结算',LOBBY:'大厅'})[runtimeInfo.phase] || runtimeInfo.phase || '待连接'} · ${active ? '运行中' : '已停止'}`;
     $('#runtime-brief').textContent=Number.isInteger(runtimeInfo.funds)?`资金 ${runtimeInfo.funds} · 刷 ${runtimeInfo.refreshed || 0}`:'未连接';
     $('#runtime-brief').title=`回合 ${runtimeInfo.round ?? '—'} · 买 ${runtimeInfo.bought || 0} / 卖 ${runtimeInfo.sold || 0} / 保留 ${runtimeInfo.kept || 0}`;
+    const rt=runtimeInfo.roundStats,unitCount=value=>rt?.countsSupported?`${rt.uncertain?'≥ ':''}${value}`:'—';
+    $('#round-trades').textContent=rt?`本回合${rt.partial?'（接入后）':''} · 买 ${unitCount(rt.bought)} / 卖 ${unitCount(rt.sold)} / 支出 ${rt.spendAvailable?rt.spent:'—'}`:'本回合统计未接入';
+    $('#round-trades').title='手动与全部自动操作共同统计；买卖按服务器成功回执计张数，赠员、晋升和免费选卡不算买卖。支出取游戏累计消耗资金的本回合增量，包含道具、刷新及升级，不扣除卖出收入。接入前记录不能补算；≥ 表示存在结果不明确的买卖。';
     $('#health-label').textContent = runtimeInfo.ready ? '接口已连接' : '未就绪';
     $('#health-list').textContent = (runtimeInfo.health || []).join('\n');
     const pending = runtimeInfo.pending || [], note = $('#mapping-note');

@@ -1,5 +1,68 @@
 // Generated MAIN bridge; edit src/main-bridge.js and src/engine/ shared audit modules.
 (() => {
+// Passive accounting: never sends, retries, blocks or authorizes a game action.
+// Native result.js labels private.stats.gold as “消耗资金”. It is cumulative spending,
+// not balance or income, so refunds, sale proceeds and acquisition bonuses cannot cancel it.
+function createRoundTradeStats({read,onChange}) {
+  const key='wei.round.trades.v1';
+  const amount=value=>Number.isSafeInteger(value)&&value>=0;
+  let current=null,seen=false,countsSupported=false;
+  const pending=new Set();
+  const identity=s=>s?.room?.inMatch && typeof s.room.code==='string' && typeof s?.me?.playerId==='string' && Number.isSafeInteger(s?.match?.public?.round) && s.match.public.round>0 ? `${s.room.code}|${s.me.playerId}|${s.match.public.round}` : '';
+  let saved=null;
+  try{saved=JSON.parse(sessionStorage.getItem(key) || 'null');}catch{}
+  function persist(){try{if(current)sessionStorage.setItem(key,JSON.stringify(current));else sessionStorage.removeItem(key);}catch{/* accounting must never affect a request */}}
+  function changed(){try{onChange?.();}catch{}}
+  function observe(s){
+    const id=identity(s),gold=s?.match?.private?.stats?.gold;
+    if(!id){if(current){current=null;persist();}seen=true;return;}
+    if(current?.identity!==id){
+      const restored=!seen && saved?.identity===id && ['bought','sold','spent','uncertain'].every(k=>amount(saved[k])) && (saved.lastGold===null || amount(saved.lastGold));
+      current=restored?{...saved,partial:true}:{identity:id,round:s.match.public.round,bought:0,sold:0,spent:0,lastGold:amount(gold)?gold:null,uncertain:0,partial:!seen};
+      seen=true;saved=null;persist();
+    }
+    let dirty=false;
+    if(s?.connection?.status!=='online' && !current.partial){current.partial=true;dirty=true;}
+    if(amount(gold)){
+      if(current.lastGold!==null && gold<current.lastGold){current.bought=0;current.sold=0;current.spent=0;current.partial=true;current.uncertain++;dirty=true;}
+      if(current.lastGold!==null && gold>current.lastGold){current.spent+=gold-current.lastGold;dirty=true;}
+      if(current.lastGold!==gold){current.lastGold=gold;dirty=true;}
+    }else if(current.lastGold!==null){current.lastGold=null;current.partial=true;dirty=true;}
+    if(dirty)persist();
+  }
+  function uncertain(id){if(current?.identity!==id)return;current.uncertain++;current.partial=true;persist();changed();}
+  async function track(type,fields,dispatch){
+    let ticket=null;
+    try{
+      const state=read();observe(state);
+      const id=identity(state),p=state?.match?.private;
+      if(id && ['g.buy','g.sell','g.refresh','g.levelUp'].includes(type)){
+        const slot=p?.shop?.slots?.[fields?.slot];
+        const unit=[...(p?.hand || []),...(p?.board || []),...(p?.temp || [])].find(x=>x?.uid===fields?.uid);
+        ticket={id,type,buy:type==='g.buy' && slot?.sold!==true && slot?.kind==='chess',sell:type==='g.sell'&&unit?.kind==='chess',
+          ambiguous:type==='g.buy' && (pending.size>0 || !slot || slot.sold===true)};
+        // A refresh/level-up or another buy already in flight may change the slot's kind.
+        if(ticket.ambiguous)for(const older of pending)if(older.type==='g.buy')older.ambiguous=true;
+        pending.add(ticket);
+      }
+    }catch{/* never turn a successful native transaction into a failed one */}
+    let result;
+    try{result=await dispatch();}
+    catch(error){if(ticket){pending.delete(ticket);if(['g.buy','g.sell'].includes(type))uncertain(ticket.id);}throw error;}
+    try{
+      observe(read());
+      if(ticket && current?.identity===ticket.id){
+        if(ticket.ambiguous || type==='g.sell'&&!ticket.sell)uncertain(ticket.id);
+        else if(ticket.buy || ticket.sell){current[ticket.buy?'bought':'sold']++;persist();changed();}
+      }
+    }catch{}
+    finally{if(ticket)pending.delete(ticket);}
+    return result;
+  }
+  observe(read());
+  return {observe,track,setCountsSupported(value){countsSupported=value===true;if(countsSupported){observe(read());if(current){current.partial=true;persist();}}},read(){return current?{round:current.round,bought:current.bought,sold:current.sold,spent:current.spent,partial:current.partial,uncertain:current.uncertain,countsSupported,spendAvailable:current.lastGold!==null}:null;}};
+}
+
 // Placement-only tolerance, shared by the controller and MAIN. Never equates different UIDs,
 // identities, elite flags, equipment counts, or moves into/out of the temporary overflow area.
 function compatiblePlacementArea(before, after) {
@@ -53,6 +116,14 @@ function canSellSurplusGift(ctx, uid, plan, chess) {
     held-(unit.golden ? 3 : 1)>=limit;
 }
 
+
+// Full keep targets may fall back to ordinary reversal; this alone grants NO sale UID.
+function canReverseFullKeep(ctx,base,rule){
+  const held=ctx?.ownedCopies?.[base];
+  return !!ctx?.ownedCopies && Number.isInteger(rule?.limit) && rule.limit>0 && rule.limit<=99 &&
+    Number.isInteger(held) && held>=rule.limit &&
+    (rule.minFunds==null || Number.isSafeInteger(rule.minFunds) && ctx.funds>rule.minFunds);
+}
 
 // Packaging gifts are retained, never added to the automatic sale ledger.
 function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems = null } = {}) {
@@ -463,6 +534,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
     if (!chess?.[FLAME] || !chess['chess_char_1_19_a'] || Object.keys(chess).length < 20) {
       throw new Error('角色图鉴不兼容，停止注入');
     }
+    const roundTrades=createRoundTradeStats({read:()=>store.get(),onChange:()=>send('snapshot',{state:view()})});
     const base = id => typeof id === 'string' && chess[id] ? (typeof chess[id].baseId === 'string' && chess[chess[id].baseId] ? chess[id].baseId : id) : null;
     // Independent copy of item-policy.js itemMergeRule: mirrors the server's _itemMergeable.
     const itemRecord = id => itemData && typeof id === 'string' && Object.hasOwn(itemData, id) &&
@@ -490,7 +562,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       const s = raw || store.get();
       const room = s?.room, pub = s?.match?.public, p = s?.match?.private;
       return {
-        readySupported:typeof actions.ready==='function',manualSupported,
+        readySupported:typeof actions.ready==='function',manualSupported,roundStats:roundTrades.read(),
         connection: { status: s?.connection?.status }, ui: { buildStale: s?.ui?.buildStale === true },
         me: { playerId: s?.me?.playerId },
         room: room ? { code: room.code, inMatch: room.inMatch,
@@ -498,7 +570,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
         match: {
           public: pub ? { phase: pub.phase, round: pub.round,
             players: Array.isArray(pub.players) ? pub.players.map(x => ({ playerId: x?.playerId, autoplay: x.autoplay })) : null } : null,
-          private: p ? { alive: p.alive, ready: p.ready, funds: p.funds,
+          private: p ? { alive: p.alive, ready: p.ready, canReady:p.canReady, funds: p.funds,
             diy: diyPicks(p.diy),
             hand: Array.isArray(p.hand) ? p.hand.map(piece) : null,
             board: Array.isArray(p.board) ? p.board.map(piece) : null,
@@ -674,7 +746,8 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       if (!rec || !idBase) throw new Error('干员 ID 不在本服务器图鉴中');
       const keep = bases(message.keep);
       const selected = bases(message.buy);
-      const retained = keep.has(idBase);
+      const surplusKeep=keep.has(idBase) && canReverseFullKeep({ownedCopies:ctx.ownedCopies,funds:ctx.p.funds},idBase,message.keepRules?.[idBase]);
+      const retained = keep.has(idBase) && !surplusKeep;
       if (retained) assertKeepRule(message.keepRules?.[idBase], ctx, idBase, offer);
       if (!retained && bases(message.excludedBuy).has(idBase)) throw new Error('此干员买入规则已禁用');
       const ordinary = rec.isGolden !== true && rec.visible === true && rec.isHidden !== true && rec.isDiy !== true;
@@ -735,8 +808,8 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       }
       const quotaGifts=new Set(flametailAudit?.gifts.map(unit=>unit.uid) || []);
       for (const [uid, unit] of fresh) ledger.set(uid, { ...unit, identity: ctx.identity,
-        surplusGift:quotaGifts.has(uid),
-        protected: (!quotaGifts.has(uid) && keep.has(unit.base)) || placementProtected.has(uid) || unit.area==='board' });
+        surplusGift:quotaGifts.has(uid) || surplusKeep && unit.base===idBase,
+        protected: (!quotaGifts.has(uid) && !(surplusKeep && unit.base===idBase) && keep.has(unit.base)) || placementProtected.has(uid) || unit.area==='board' });
       return { count: fresh.length };
     }
     // Item purchases never enter the chess sale ledger. Both worlds check the
@@ -1086,13 +1159,13 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       if(ctx.identity!==message.identity || JSON.stringify(view().match.private)!==message.stamp ||
         !(message.maximumFunds===null || Number.isSafeInteger(message.maximumFunds)&&message.maximumFunds>=0) ||
         typeof message.skipTenth!=='boolean' || message.maximumFunds!==null && ctx.p.funds>message.maximumFunds ||
-        message.skipTenth && round%10===0 || !Number.isInteger(round) || round<1 || ctx.p.temp.length || pendingReward)
+        message.skipTenth && round%10===0 || !Number.isInteger(round) || round<1 || ctx.p.temp.some(Boolean) || ctx.p.canReady===false || pendingReward)
         throw new Error('准备前身份、资金、回合、奖励或库存变化；未发送准备');
       if(preparedRounds.has(ctx.identity))throw new Error('本回合准备已尝试，不重复发送');
       preparedRounds.add(ctx.identity);if(preparedRounds.size>128)preparedRounds.delete(preparedRounds.values().next().value);
       if(await actions.ready(true)!==true)throw new Error('准备请求未确认，可能已生效；不重试');
       const confirmed=await waitFor(raw=>raw?.room?.code===s.room.code && raw?.me?.playerId===s.me.playerId &&
-        (raw?.match?.private?.ready===true || ['BATTLE','POST'].includes(raw?.match?.public?.phase)));
+        (raw?.match?.private?.ready===true || ['COMBAT','SETTLE','BATTLE','POST'].includes(raw?.match?.public?.phase)));
       if(!confirmed)throw new Error('准备回执已收到，但状态未确认；不重试');
       return {prepared:true};
     }
@@ -1158,12 +1231,13 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
         throw error;
       }finally{manualInFlight=false;manualMonitor=false;}
     }
-    let nativeNet=null,originalRequest=null,nativeHook=null;
+    let nativeNet=null,originalRequest=null,requestBeforeHook=null,nativeHook=null;
     try{
       nativeNet=sp?.net || (await import(new URL('js/net.js',root))).net;
       if(disposed)return;
       if(!nativeNet || typeof nativeNet.request!=='function')throw new Error('未找到原生请求接口');
-      originalRequest=nativeNet.request;
+      requestBeforeHook=nativeNet.request;
+      originalRequest=function(type,fields={},...extra){return roundTrades.track(type,fields,()=>requestBeforeHook.call(this,type,fields,...extra));};
       nativeHook=function(type,fields={},...extra){
         // Own intent is marked only during the synchronous call into actions/net.request.
         // A long-lived async flag would accidentally hide concurrent native clicks.
@@ -1182,10 +1256,10 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       };
       nativeNet.request=nativeHook;
       if(nativeNet.request!==nativeHook)throw new Error('原生请求接口不可监测');
-      manualSupported=true;
+      manualSupported=true;roundTrades.setCountsSupported(true);
       restoreManual=()=>{
         manualEnabled=false;manualSupported=false;
-        if(nativeNet.request===nativeHook)nativeNet.request=originalRequest;
+        if(nativeNet.request===nativeHook)nativeNet.request=requestBeforeHook;
         for(const waiter of [...manualWaiters.values()])waiter.finish({ok:false,reason:'工作台已关闭，未确认请求不会重试'});
       };
     }catch(error){manualSupported=false;console.warn('[wei] 手动操作协调不可用，仍保留未知变化停机保护',error);}
@@ -1213,6 +1287,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
     window.addEventListener('message', handleMessage);
     observePlacement();
     offStore = store.subscribe(raw => {
+      roundTrades.observe(raw);
       observePlacement();
       // Any manual selection/changed offer burns its typed, one-use proof, even
       // if a later unrelated offer happens to show exactly the same cards.

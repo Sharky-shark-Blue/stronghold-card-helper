@@ -1,6 +1,6 @@
-// Generated local runtime v0.3.2; edit src/runtime-host.js and src/engine/.
+// Generated local runtime v0.3.3; edit src/runtime-host.js and src/engine/.
 (() => {
-const BUILD_VERSION="0.3.2";
+const BUILD_VERSION="0.3.3";
 // Generated from 全静态条目ID索引.txt (items.json). Base IDs only: 普通 _e_a and special IDs; 升级 _e_b variants map to the same item name.
 const ITEM_CATALOGUE = Object.freeze([
   {"id":"chess_item_3_04_e_a","name":"炎国短刀","tier":3},
@@ -894,6 +894,14 @@ function canSellSurplusGift(ctx, uid, plan, chess) {
 }
 
 
+// Full keep targets may fall back to ordinary reversal; this alone grants NO sale UID.
+function canReverseFullKeep(ctx,base,rule){
+  const held=ctx?.ownedCopies?.[base];
+  return !!ctx?.ownedCopies && Number.isInteger(rule?.limit) && rule.limit>0 && rule.limit<=99 &&
+    Number.isInteger(held) && held>=rule.limit &&
+    (rule.minFunds==null || Number.isSafeInteger(rule.minFunds) && ctx.funds>rule.minFunds);
+}
+
 // Packaging gifts are retained, never added to the automatic sale ledger.
 function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems = null } = {}) {
   const fail = reason => ({ ok:false, reason });
@@ -1313,10 +1321,10 @@ function pickCandidate(ctx, plan, chess) {
     const rec = chess[id];
     const base = baseId(id, chess);
     if (!base) continue;
-    // User-confirmed priority: an active keep rule owns its operator. When its funds gate
-    // is unmet or its current holding target is met, the operator is not bought at all — the
-    // ordinary buy list and the cheap (price 0/1) path cannot buy it either.
-    if (blocked.has(base)) continue;
+    // Below target: keep priority. At target: only a fresh ordinary purchase may reverse.
+    // An unmet funds gate and purchases that would merge old UIDs remain blocked.
+    const surplusKeep=blocked.has(base) && canReverseFullKeep(ctx,base,plan.keepRules?.[base]);
+    if (blocked.has(base) && !surplusKeep) continue;
     const retain = keep.has(base);
     if (retain && !keepRuleAllows(ctx, base, plan.keepRules?.[base], offer.golden === true || rec.isGolden === true ? 3 : 1)) continue;
     if (!retain && excluded.has(base)) continue; // A disabled buy rule never overrides an active keep rule.
@@ -1338,7 +1346,7 @@ function pickCandidate(ctx, plan, chess) {
       // Its new elite can be sold subject to keep targets; other old UID changes fail closed.
     }
     found.push({ slot, id, base, price: offer.price, reason: retain ? '保留' : customBuy ? '自定义' : '低价',
-      priority: retain ? 0 : customBuy ? 1 : 2, ...(keepMerge ? {keepMerge} : {}) });
+      priority: retain ? 0 : customBuy ? 1 : 2, ...(surplusKeep ? {surplusKeep:true} : {}), ...(keepMerge ? {keepMerge} : {}) });
   }
   found.sort((a, b) => a.priority - b.priority || a.slot - b.slot);
   return found[0] || null;
@@ -1504,7 +1512,7 @@ function pickCoinTarget(ctx, preferUids = []) {
 }
 
 function auditPurchase(before, after, candidate, plan, chess) {
-  const retain=keepBases(plan,chess).has(candidate.base);
+  const retain=keepBases(plan,chess).has(candidate.base) && candidate.surplusKeep!==true;
   if(candidate.id===FLAMETAIL_ID){
     const checked=auditFlametailPurchase(before,after,candidate,{chess});
     return checked.ok ? {...checked,retain} : checked;
@@ -1800,6 +1808,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
   let starting = false;
   let busy = false;
   let manualContext = null;
+  let readyHold=false;
   let queued = false;
   let planQueued = false;
   const settingsProtected=new Set(), transactionKeeps=new Set();
@@ -1849,7 +1858,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
   }
   function stop(reason = '已手动停止') {
     const wasLive = running || starting;
-    running = false;
+    running = false;readyHold=false;
     starting = false;
     generation++;
     pineconePending = false; packagingSalePending=false;packagingPending=false;
@@ -1948,7 +1957,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     });
   }
   function schedule() {
-    if (!running || busy || queued || manualContext) return;
+    if (!running || busy || queued || manualContext || readyHold) return;
     queued = true;
     queueMicrotask(() => {
       queued = false;
@@ -2498,7 +2507,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
   }
 
   async function step() {
-    if (!running || busy || manualContext) return;
+    if (!running || busy || manualContext || readyHold) return;
     busy = true;transactionKeeps.clear();
     for(const base of keepBases(getPlan(),chess))transactionKeeps.add(base);
     let again = false;
@@ -2613,6 +2622,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
         .filter(unit=>!soldEarly.has(unit.uid) && current.unitByUid.has(unit.uid));
       const quotaGifts=new Set(candidate.id===FLAMETAIL_ID ?
         [...audit.gifts.map(gift=>gift.uid),...(promotion ? [promotion.unit.uid] : [])] : []);
+      if(candidate.surplusKeep===true)quotaGifts.add(audit.parent.uid);
       function retainQueued(snap,unit){
         const plan=getPlan(), protectedBases=new Set([...keep,...transactionKeeps,...keepBases(plan,chess)]);
         if(quotaGifts.has(unit.uid) && protectedBases.has(unit.base))
@@ -2747,6 +2757,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
   }
 
   async function start() {
+    if(readyHold){report('blocked','自动准备条件已满足，正在等待交接');return false;}
     if (manualContext) { report('blocked','手动操作尚未核对完成，请稍后再开启倒转'); return false; }
     if (running || starting || busy) { report('blocked', '上一笔尚未结束，请稍后再启动'); return false; }
     settingsProtected.clear();transactionKeeps.clear();
@@ -2869,7 +2880,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     finally{clearTimeout(ticket.expiry);if(manualContext===ticket)manualContext=null;releaseIfIdle();if(running)schedule();}
   }
 
-  return { start, stop, beginManual, completeManual, get manualPending(){return !!manualContext;}, updatePlan() {
+  return { start, stop, beginManual, completeManual, holdForReady(){readyHold=true;}, releaseReadyHold(){readyHold=false;schedule();}, get manualPending(){return !!manualContext;}, updatePlan() {
     if(!running)return;
     const keep=keepBases(getPlan(),chess), snap=inspectMatch(read(),chess,{allowReward:allowReward()});
     if(snap.ok)for(const unit of snap.units)if(keep.has(unit.base))settingsProtected.add(unit.uid);
@@ -3458,13 +3469,15 @@ function isLiveItemPause(before, after) {
 }
 
 // Independent endless-mode ready scheduler. Never arms on load or retries an uncertain round.
-function createAutoReady({read,getOptions,available,tradeBusy,handoff,acquireLock,prepare,claim,audit,onStatus}) {
+function createAutoReady({read,getOptions,available,tradeBusy,handoff,acquireLock,prepare,claim,audit,onStatus,hold=()=>{},unhold=()=>{}}) {
   let running=false,busy=false,generation=0,timer=null,owner='',stable='',stableAt=0,lastMessage='已关闭';
+  let holding=false;
+  const releaseHold=()=>{if(holding){holding=false;unhold();}};
   const attempted=new Set();
   const who=s=>`${s?.room?.code || ''}|${s?.me?.playerId || ''}`;
   function report(message){lastMessage=message;onStatus?.({readyRunning:running,readyBusy:busy,readyMessage:message});}
   function stop(message='已关闭自动准备；已发出的准备指令仍可能生效'){
-    running=false;generation++;clearInterval(timer);timer=null;stable='';report(message);
+    releaseHold();running=false;generation++;clearInterval(timer);timer=null;stable='';report(message);
   }
   function valid(s){return s?.connection?.status==='online' && !s?.ui?.buildStale && s?.readySupported===true &&
     s?.match?.private?.alive===true && s?.room?.inMatch===true && typeof s.room.code==='string' && typeof s?.me?.playerId==='string' &&
@@ -3478,17 +3491,19 @@ function createAutoReady({read,getOptions,available,tradeBusy,handoff,acquireLoc
       const s=read();
       if(!available() || !valid(s) || who(s)!==owner){stop('自动准备已停止：连接、自检、座位或对局状态变化');return;}
       const p=s.match.private,pub=s.match.public,o=getOptions();
-      if(o.confirmed===false){stable='';report('等待准备设置保存');return;}
-      if(pub.phase!=='PREP'){stable='';report('等待下一次整备');return;}
+      if(o.confirmed===false){releaseHold();stable='';report('等待准备设置保存');return;}
+      if(pub.phase!=='PREP'){releaseHold();stable='';report('等待下一次整备');return;}
       if(!Number.isSafeInteger(pub.round) || pub.round<1 || !Number.isSafeInteger(p.funds) || p.funds<0){stop('回合或资金状态无效，自动准备已停止');return;}
-      if(p.ready===true){report('本回合已准备，等待下一回合');return;}
+      if(p.ready===true){releaseHold();report('本回合已准备，等待下一回合');return;}
       if(p.ready!==false){stop('准备状态不明确，自动准备已停止');return;}
-      if(o.skipTenth && pub.round%10===0){stable='';report(`第 ${pub.round} 回合跳过，等待你手动准备`);return;}
-      if(o.funds!==null && p.funds>o.funds){stable='';report(`等待资金 ≤ ${o.funds}（当前 ${p.funds}）`);return;}
-      if(p.shop?.rewardOffer?.slots?.length || !Array.isArray(p.temp) || p.temp.length){stable='';report('等待处理奖励或临时区');return;}
+      if(o.skipTenth && pub.round%10===0){releaseHold();stable='';report(`第 ${pub.round} 回合跳过，等待你手动准备`);return;}
+      if(o.funds!==null && p.funds>o.funds){releaseHold();stable='';report(`等待资金 ≤ ${o.funds}（当前 ${p.funds}）`);return;}
+      holding=true;hold();
+      if(p.shop?.rewardOffer?.slots?.length || !Array.isArray(p.temp) || p.temp.some(Boolean)){stable='';report('等待处理奖励或临时区');return;}
+      if(p.canReady===false){stable='';report('等待处理本回合的准备条件');return;}
       if(tradeBusy()){stable='';report('等待在途交易核对完成');return;}
       const identity=`${owner}|${pub.round}`,key=`${o.epoch}|${identity}`,stamp=JSON.stringify(p),quiet=key+'|'+stamp+'|'+JSON.stringify([o.funds,o.skipTenth]);
-      if(attempted.has(key)){report('本回合已尝试准备，不重复发送');return;}
+      if(attempted.has(key)){releaseHold();report('本回合已尝试准备，不重复发送');return;}
       if(stable!==quiet){stable=quiet;stableAt=Date.now();report('条件已满足，等待状态稳定');return;}
       if(Date.now()-stableAt<750)return;
       busy=true;report('正在核对并提交准备');
@@ -3564,7 +3579,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
 .quick-dock .quick-body{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#856078 transparent;padding:3px 12px 11px}.quick-dock .quick-body[hidden]{display:none!important}.quick-dock .quick-body:not([hidden]){animation:quick-body-in .16s cubic-bezier(.2,.8,.3,1)}.quick-dock .quick-master{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #e0b9cc14}.quick-dock .quick-caption{font-size:11px;color:#efdae6}.quick-dock .quick-description{font-size:9px;color:#ab90a6;margin-top:1px}.quick-dock .quick-section-label{display:flex;align-items:center;justify-content:space-between;font-size:9px;color:#a88ba2;padding:12px 0 5px;letter-spacing:.04em}
 .quick-dock .quick-switch{width:31px;height:18px;border-radius:99px;background:#4b3b4c;border:1px solid #b797af28;padding:2px;justify-content:flex-start;position:relative;box-shadow:inset 0 1px 3px #0a030d40}.quick-dock .quick-switch:before{content:"";display:block;height:12px;width:12px;background:#cab8c7;border-radius:50%;box-shadow:0 1px 3px #13091555;transition:transform .18s cubic-bezier(.2,.8,.3,1),background .18s}.quick-dock .quick-switch[aria-checked=true]{background:#b77894;border-color:#e6aec64d}.quick-dock .quick-switch[aria-checked=true]:before{transform:translateX(12px);background:#fff0f7}
 .quick-dock .quick-items{display:flex;flex-direction:column;gap:2px}.quick-dock .quick-item{display:flex;align-items:center;gap:8px;min-height:42px;padding:6px 4px;border-radius:8px;transition:background .15s}.quick-dock .quick-item:hover{background:#dca9c50a}.quick-dock .quick-item-icon{height:28px;width:28px;flex:none;position:relative;overflow:hidden;border:1px solid #b18a9c3b;border-radius:7px;background:#231827;display:grid;place-items:center;font-size:10px;color:#c3a1b8}.quick-dock .quick-item-icon img{position:absolute;inset:0;height:100%;width:100%;object-fit:cover}.quick-dock .quick-item-text{flex:1;min-width:0}.quick-dock .quick-item-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#dfcbd8}.quick-dock .quick-item-hint{font-size:9px;color:#a48c9f}.quick-dock .quick-item[data-state=full] .quick-item-hint{color:#e8c281}.quick-dock .quick-item[data-state=enabled] .quick-item-hint{color:#8ad0af}.quick-dock .quick-item[data-state=disabled] .quick-item-hint{color:#d296aa}
-.quick-dock .quick-empty{font-size:10px;color:#a38a9e;padding:15px 0;text-align:center}.quick-dock .quick-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:10px;border-top:1px solid #dfb6c919;gap:8px}.quick-dock .quick-open{color:#e9c9da;border:1px solid #d6a7bf2e;padding:4px 9px;border-radius:6px;font-size:10px}.quick-dock .quick-open:hover{background:#ce8fa91a}.quick-dock .quick-counts{font-size:9px;color:#a98a9f;font-variant-numeric:tabular-nums}.quick-dock .quick-feedback{font-size:10px;color:#e8bcce;line-height:1.6;margin-top:7px;overflow-wrap:anywhere}.quick-dock .quick-feedback:empty{display:none}.quick-dock[data-busy=true] .quick-mark{opacity:.6}
+.quick-dock .quick-empty{font-size:10px;color:#a38a9e;padding:15px 0;text-align:center}.quick-dock .quick-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:10px;border-top:1px solid #dfb6c919;gap:8px}.quick-dock .quick-open{color:#e9c9da;border:1px solid #d6a7bf2e;padding:4px 9px;border-radius:6px;font-size:10px}.quick-dock .quick-open:hover{background:#ce8fa91a}.quick-dock .quick-bottom{flex-wrap:wrap}.quick-dock .quick-counts{flex-basis:100%;font-size:10px;color:#a98a9f;font-variant-numeric:tabular-nums}.quick-dock .quick-feedback{font-size:10px;color:#e8bcce;line-height:1.6;margin-top:7px;overflow-wrap:anywhere}.quick-dock .quick-feedback:empty{display:none}.quick-dock[data-busy=true] .quick-mark{opacity:.6}
 
 
 .quick-dock .quick-empty:before{width:96px;height:96px}
@@ -3616,9 +3631,10 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
     master.title=data.paused?'恢复原配置，不清零计数':'暂停全部道具，不改变单件配置';
     for(const [id,row] of rows){const item=data.items.find(i=>i.id===id);row.querySelector('button').disabled=busy>0 || !data.uiReady || item?.status==='full';}
   }
+  function roundSummary(){const r=data.roundStats;if(!r)return '本回合统计未接入';const count=n=>r.countsSupported?`${r.uncertain?'≥':''}${n}`:'—';return `本回合${r.partial?'·接入后':''} 买 ${count(r.bought)} · 卖 ${count(r.sold)} · 支出 ${r.spendAvailable?r.spent:'—'}`;}
   function update(next){
     if(destroyed)return;data={...data,...next};data.items=Array.isArray(data.items)?data.items:[];
-    text($('.quick-counts'),`购 ${data.bought || 0} · 售 ${data.sold || 0}`);
+    text($('.quick-counts'),roundSummary());$('.quick-counts').title='本回合手动及全部自动操作；支出含干员、道具、刷新与升级，不抵扣卖出收入。接入前不能补算，≥ 表示有结果未明确的交易。';
     if(kind!=='items'){controls();place();return;}
     const ids=new Set(data.items.map(i=>i.id));for(const [id,row] of rows)if(!ids.has(id)){row.remove();rows.delete(id);}
     for(const [index,item] of data.items.entries()){
@@ -3632,7 +3648,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       if(image && image.getAttribute('src')!==src){image.remove();image=null;}
       if(src && !image && row.dataset.failedSrc!==src){image=doc.createElement('img');image.src=src;image.alt='';image.loading='lazy';image.decoding='async';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>{row.dataset.failedSrc=src;image?.remove();},{once:true});row.querySelector('.quick-item-icon').append(image);}
     }
-    $('.quick-empty').hidden=data.items.length>0;text($('.quick-item-total'),`${data.items.length} 项`);text($('.quick-counts'),`购 ${data.bought || 0} · 售 ${data.sold || 0}`);controls();place();
+    $('.quick-empty').hidden=data.items.length>0;text($('.quick-item-total'),`${data.items.length} 项`);text($('.quick-counts'),roundSummary());controls();place();
   }
   function click(event){
     const button=event.target.closest?.('button[data-quick]');if(!button || button.disabled || destroyed || (trustedOnly && !event.isTrusted))return;
@@ -3750,7 +3766,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       Model.ITEMS.map(item => item.id),gameItems);
     let loadedVersion='不可用',extensionId='不可用';try{loadedVersion=chrome.runtime.getManifest().version;extensionId=chrome.runtime.id.slice(-8);}catch{}
     const randomAvailable=typeof globalThis.crypto?.getRandomValues==='function';
-    return {...live,...readyLive,autoReady:plan.autoReady,readyReady:!!readyController&&auditReady&&!healthError&&state?.readySupported===true,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
+    return {...live,...readyLive,roundStats:state?.roundStats || null,autoReady:plan.autoReady,readyReady:!!readyController&&auditReady&&!healthError&&state?.readySupported===true,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
       eligible:check.ok,eligibility:check.reason || '本人整备期，可手动启动',matches:mapping.matches,keepCounts,itemOwnedCounts,itemMatches:mapping.itemMatches,useNotes:mapping.useNotes,pending:mapping.pending,issues:mapping.issues,skipped:mapping.skipped,
       health:[`脚本 v${BUILD_VERSION} · 已加载扩展 v${loadedVersion} / ${extensionId} · 服务器 ${location.host}`,`安全随机字节 ${randomAvailable ? '可用' : '不可用，拒绝交易'} · ${isSecureContext ? '安全上下文' : '普通 HTTP 上下文'}`,healthError || (transport ? '网页桥接与扩展后台已连接' : '未连接网页交易接口'),auditReady ? '审计日志可用；运行锁在手动启动时获取' : '审计日志尚未就绪',(garrisons ? '特质图鉴已读取' : '特质图鉴不可用：赠币外的免费奖励需手动选择'),gameItems ? '本服道具数据已读取，可按唯一名称识别图鉴外道具' : '本服道具数据不可用：图鉴外道具维持待识别，已知静态 ID 仍需商店精确匹配',check.reason || '本人整备、库存与 UID 可核对',mapping.issues.length ? mapping.issues.join('；') : mapping.pending.length ? `待识别 ${mapping.pending.length} 项，仅这些条目不自动交易；${mapping.skipped.slice(0,3).join('；')}${mapping.pending.length>3?'；其余见名单':''}` : '已启用的名单可按本服图鉴匹配'],
       gameKeys:gameKeys(),logCount:auditLog?.entries.length || 0,entries:(auditLog?.entries || []).slice(-60)};
@@ -4011,6 +4027,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       readyController=createAutoReady({read:transport.read,
         getOptions:()=>({...plan.autoReady,epoch:plan.itemSession.epoch,confirmed:readySettingsStamp===JSON.stringify(plan.autoReady)}),
         available:()=>!closed&&uiReady&&auditReady&&!healthError&&!matchSyncPending&&chrome.runtime.getManifest().version===BUILD_VERSION,
+        hold:()=>controller?.holdForReady(),unhold:()=>controller?.releaseReadyHold(),
         tradeBusy:()=>!!(controller?.busy||controller?.starting||controller?.manualPending),
         handoff:()=>controller?.stop('自动准备条件已满足，停止倒转并等待准备'),
         acquireLock:transport.acquireLock,prepare:transport.prepare,

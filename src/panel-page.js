@@ -1,7 +1,7 @@
 import { mountWorkbench } from './ui.js';
 import { STORAGE_KEY } from './model.js';
 const BACKUP_KEY = 'wei.workbench.plan.backup.v1'; // 导入配置前自动备份的上一份配置
-const FRAME_VERSION='0.3.2',CHANNEL='wei-cardkeeper.ui.v1';
+const FRAME_VERSION='0.3.3',CHANNEL='wei-cardkeeper.ui.v1';
 const token = new URLSearchParams(location.hash.slice(1)).get('token');
 const server = new URL(location.href).searchParams.get('server');
 const serverOrigin=server ? new URL(server).origin : '';

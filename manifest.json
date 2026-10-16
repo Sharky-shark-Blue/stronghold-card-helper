@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "卫戍协议拿牌器",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "卫戍协议网页版辅助工具：管理买入与保留名单，支持自动倒转、道具抓取与独立悬浮开关。自动交易仅在手动启动后运行。",
   "minimum_chrome_version": "102",
   "permissions": [
