@@ -431,6 +431,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       buy: slot => send('g.buy', { slot }),
       sell: uid => send('g.sell', { uid }),
       refresh: () => send('g.refresh', {}),
+      ready: ready => send('g.ready', {ready}),
       equip: (itemUid, targetUid) => send('g.equip', { itemUid, targetUid }), // never a replaceUid
       reward: idx => send('g.reward', { idx }),
     });
@@ -485,6 +486,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       const s = raw || store.get();
       const room = s?.room, pub = s?.match?.public, p = s?.match?.private;
       return {
+        readySupported:typeof actions.ready==='function',
         connection: { status: s?.connection?.status }, ui: { buildStale: s?.ui?.buildStale === true },
         me: { playerId: s?.me?.playerId },
         room: room ? { code: room.code, inMatch: room.inMatch,
@@ -1073,16 +1075,33 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       }
       return { uid };
     }
+    const preparedRounds=new Set();
+    async function prepareRound(message){
+      if(typeof actions.ready!=='function')throw new Error('本服不提供准备接口');
+      const ctx=context(),s=store.get(),round=s.match.public.round;
+      if(ctx.identity!==message.identity || JSON.stringify(view().match.private)!==message.stamp ||
+        !(message.maximumFunds===null || Number.isSafeInteger(message.maximumFunds)&&message.maximumFunds>=0) ||
+        typeof message.skipTenth!=='boolean' || message.maximumFunds!==null && ctx.p.funds>message.maximumFunds ||
+        message.skipTenth && round%10===0 || !Number.isInteger(round) || round<1 || ctx.p.temp.length || pendingReward)
+        throw new Error('准备前身份、资金、回合、奖励或库存变化；未发送准备');
+      if(preparedRounds.has(ctx.identity))throw new Error('本回合准备已尝试，不重复发送');
+      preparedRounds.add(ctx.identity);if(preparedRounds.size>128)preparedRounds.delete(preparedRounds.values().next().value);
+      if(await actions.ready(true)!==true)throw new Error('准备请求未确认，可能已生效；不重试');
+      const confirmed=await waitFor(raw=>raw?.room?.code===s.room.code && raw?.me?.playerId===s.me.playerId &&
+        (raw?.match?.private?.ready===true || ['BATTLE','POST'].includes(raw?.match?.public?.phase)));
+      if(!confirmed)throw new Error('准备回执已收到，但状态未确认；不重试');
+      return {prepared:true};
+    }
     handleMessage = event => {
       const msg = event.data;
       if (event.source !== window || event.origin !== location.origin ||
           msg?.channel !== CHANNEL || msg.side !== 'ui' || msg.nonce !== nonce || msg.version !== cfg.version) return;
       if (msg.type === 'dispose') { ownBridge.dispose(); return; }
       if (msg.type === 'snapshot-request') { send('snapshot', { state: view() }); return; }
-      if (!['buy','buy-item','sell','refresh','coin','use-item','reward','merge-reward'].includes(msg.type) || typeof msg.rid !== 'string' || msg.rid.length > 100) return;
+      if (!['buy','buy-item','sell','refresh','coin','use-item','reward','merge-reward','prepare'].includes(msg.type) || typeof msg.rid !== 'string' || msg.rid.length > 100) return;
       if (busy) { reject(msg.rid, '另一笔交易尚未结束'); return; }
       busy = true;
-      (msg.type === 'buy' ? buy(msg) : msg.type === 'buy-item' ? buyItem(msg) : msg.type === 'sell' ? sell(msg) :
+      (msg.type === 'prepare' ? prepareRound(msg) : msg.type === 'buy' ? buy(msg) : msg.type === 'buy-item' ? buyItem(msg) : msg.type === 'sell' ? sell(msg) :
         msg.type === 'coin' ? useCoin(msg) : msg.type === 'use-item' ? useItem(msg) : msg.type === 'reward' ? pickReward(msg) :
         msg.type === 'merge-reward' ? pickFlametailMergeReward(msg) : refresh(msg)).then(
         result => send('response', { rid: msg.rid, ok: true, result }),

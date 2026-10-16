@@ -21,8 +21,9 @@ export function createQuickDock(options) {
   }});
   const auto=createQuickWindow({...options,kind:'auto',storage:scoped('auto')});
   const items=createQuickWindow({...options,kind:'items',storage:scoped('items')});
-  const each=(kind,action)=>{if(kind==='auto')auto[action]();else if(kind==='items')items[action]();else{auto[action]();items[action]();}};
-  return {update(value){auto.update(value);items.update(value);},show(kind){each(kind,'show');},hide(kind){each(kind,'hide');},destroy(){auto.destroy();items.destroy();}};
+  const ready=createQuickWindow({...options,kind:'ready',storage:scoped('ready')});
+  const each=(kind,action)=>{if(kind==='auto')auto[action]();else if(kind==='items')items[action]();else if(kind==='ready')ready[action]();else{auto[action]();items[action]();ready[action]();}};
+  return {update(value){auto.update(value);items.update(value);ready.update(value);},show(kind){each(kind,'show');},hide(kind){each(kind,'hide');},destroy(){auto.destroy();items.destroy();ready.destroy();}};
 }
 function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly=true,kind}) {
   const doc=parent.ownerDocument || document, win=doc.defaultView;
@@ -55,11 +56,11 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
 
 @keyframes quick-body-in{from{opacity:0;translate:0 -4px}to{opacity:1;translate:0 0}}@keyframes quick-arrive{from{opacity:0;translate:0 7px}to{opacity:1;translate:0 0}}@media(prefers-reduced-motion:reduce){.quick-dock,.quick-dock *,.quick-dock :before{animation:none!important;transition:none!important}}
 `;
-  const root=doc.createElement('section');root.className='quick-dock';root.hidden=true;root.dataset.kind=kind;root.setAttribute('aria-label',kind==='auto'?'倒转开关悬浮窗':'道具抓取开关悬浮窗');
-  root.innerHTML=`<header class="quick-head"><div class="quick-grip" tabindex="0" title="拖动此窗口；方向键微调"><span class="quick-mark" aria-hidden="true"></span><div><div class="quick-title">${kind==='auto'?'倒转开关':'道具抓取开关'}</div><div class="quick-state"><i class="quick-led"></i><span class="quick-state-label">未连接</span></div></div></div>${kind==='auto'?'<button class="quick-run" data-quick="auto" type="button" aria-label="启动自动倒转">启动</button>':''}<button class="quick-icon-button quick-fold" data-quick="fold" type="button" title="收起此窗口" aria-expanded="true">−</button><button class="quick-icon-button" data-quick="hide" type="button" title="仅关闭此窗口，不改变运行或抓取设置" aria-label="关闭此悬浮窗">×</button></header><div class="quick-body">${kind==='items'?'<div class="quick-master"><div><div class="quick-caption">道具抓取总开关</div><div class="quick-description">保留各项配置与计数</div></div><button type="button" class="quick-switch" role="switch" data-quick="master" aria-label="道具抓取总开关" aria-checked="true"></button></div><div class="quick-section-label"><span>单件道具</span><span class="quick-item-total">0 项</span></div><div class="quick-items"></div><div class="quick-empty">先在主面板添加道具</div>':''}<div class="quick-bottom"><button class="quick-open" type="button" data-quick="panel">打开主面板 ↗</button><span class="quick-counts"></span></div><div class="quick-feedback" role="status" aria-live="polite"></div></div>`;
+  const root=doc.createElement('section');root.className='quick-dock';root.hidden=true;root.dataset.kind=kind;root.setAttribute('aria-label',kind==='ready'?'自动准备悬浮窗':kind==='auto'?'倒转开关悬浮窗':'道具抓取开关悬浮窗');
+  root.innerHTML=`<header class="quick-head"><div class="quick-grip" tabindex="0" title="拖动此窗口；方向键微调"><span class="quick-mark" aria-hidden="true"></span><div><div class="quick-title">${kind==='ready'?'自动准备 · 无尽':kind==='auto'?'倒转开关':'道具抓取开关'}</div><div class="quick-state"><i class="quick-led"></i><span class="quick-state-label">未连接</span></div></div></div>${kind!=='items'?'<button class="quick-run" data-quick="'+(kind==='ready'?'ready':'auto')+'" type="button">启动</button>':''}<button class="quick-icon-button quick-fold" data-quick="fold" type="button" title="收起此窗口" aria-expanded="true">−</button><button class="quick-icon-button" data-quick="hide" type="button" title="仅关闭此窗口，不改变运行或抓取设置" aria-label="关闭此悬浮窗">×</button></header><div class="quick-body">${kind==='ready'?'<div class="quick-master"><div><div class="quick-caption">每十回合不准备</div><div class="quick-description">跳过第10、20、30…回合</div></div><button class="quick-switch" type="button" role="switch" data-quick="ready-skip" aria-label="每十回合不自动准备" aria-checked="false"></button></div><p class="quick-ready-condition quick-description"></p>':''}${kind==='items'?'<div class="quick-master"><div><div class="quick-caption">道具抓取总开关</div><div class="quick-description">保留各项配置与计数</div></div><button type="button" class="quick-switch" role="switch" data-quick="master" aria-label="道具抓取总开关" aria-checked="true"></button></div><div class="quick-section-label"><span>单件道具</span><span class="quick-item-total">0 项</span></div><div class="quick-items"></div><div class="quick-empty">先在主面板添加道具</div>':''}<div class="quick-bottom"><button class="quick-open" type="button" data-quick="panel">打开主面板 ↗</button><span class="quick-counts"></span></div><div class="quick-feedback" role="status" aria-live="polite"></div></div>`;
   parent.append(css,root);
   const $=s=>root.querySelector(s), grip=$('.quick-grip'), list=$('.quick-items'), rows=new Map();
-  let data={items:[],running:false,starting:false,ready:false,eligible:false}, state={x:Math.max(8,win.innerWidth-(kind==='auto' && win.innerWidth>=600?584:292)),y:kind==='items' && win.innerWidth<600?340:88,collapsed:false,visible:false};
+  let data={items:[],running:false,starting:false,ready:false,eligible:false}, state={x:Math.max(8,win.innerWidth-(kind!=='items' && win.innerWidth>=600?584:292)),y:kind==='ready'?260:kind==='items' && win.innerWidth<600?340:88,collapsed:false,visible:false};
   let destroyed=false, drag=null, busy=0, touched=0, saveTimer=null, lastStart=0;
   const clamp=n=>Math.max(8,n);
   function place(){
@@ -73,7 +74,13 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
   function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=null;void Promise.resolve().then(()=>storage?.set({...state})).catch(()=>{if(!destroyed)$('.quick-feedback').textContent='悬浮位置未保存';});},180);}
   function text(node,value){if(node.textContent!==String(value))node.textContent=String(value);}
   function controls(){
-    const run=data.running || data.starting;root.dataset.running=String(kind==='auto'?run:!data.paused && data.uiReady);root.dataset.busy=String(busy>0);
+    const run=data.running || data.starting;root.dataset.running=String(kind==='ready'?!!data.readyRunning:kind==='auto'?run:!data.paused && data.uiReady);root.dataset.busy=String(busy>0);
+    if(kind==='ready'){
+      const button=$('.quick-run');text(button,data.readyRunning?'关闭':'开启');button.setAttribute('aria-label',data.readyRunning?'关闭自动准备':'手动开启自动准备');button.disabled=!data.readyRunning&&(busy>0||!data.readyReady);
+      text($('.quick-state-label'),data.readyMessage || '已关闭');
+      const skip=$('[data-quick=ready-skip]');skip.setAttribute('aria-checked',String(data.autoReady?.skipTenth===true));skip.disabled=busy>0||!data.uiReady;
+      text($('.quick-ready-condition'),`资金 ${data.autoReady?.funds===null?'不限':'≤ '+(data.autoReady?.funds ?? 0)} · 开关不随布局保存`);return;
+    }
     if(kind==='auto'){
       const button=$('.quick-run');text(button,run?'停止':'启动');button.setAttribute('aria-label',run?'停止自动倒转':'启动自动倒转');
       button.disabled=!run && (busy>0 || !data.ready || !data.eligible);button.title=run?'停止自动倒转':data.eligibility || '手动启动自动倒转';
@@ -88,7 +95,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
   function update(next){
     if(destroyed)return;data={...data,...next};data.items=Array.isArray(data.items)?data.items:[];
     text($('.quick-counts'),`购 ${data.bought || 0} · 售 ${data.sold || 0}`);
-    if(kind==='auto'){controls();place();return;}
+    if(kind!=='items'){controls();place();return;}
     const ids=new Set(data.items.map(i=>i.id));for(const [id,row] of rows)if(!ids.has(id)){row.remove();rows.delete(id);}
     for(const [index,item] of data.items.entries()){
       let row=rows.get(item.id);
@@ -109,8 +116,8 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
     if(action==='fold'){state.collapsed=!state.collapsed;touched++;place();save();return;}
     if(action==='hide'){state.visible=false;touched++;place();save();return;}
     if(action==='panel'){onOpenPanel();return;}
-    if(kind==='auto' ? action!=='auto' : !['master','item'].includes(action))return;
-    const stop=action==='auto' && (data.running || data.starting);
+    if(kind==='ready'?!['ready','ready-skip'].includes(action):kind==='auto' ? action!=='auto' : !['master','item'].includes(action))return;
+    const stop=action==='ready'&&data.readyRunning || action==='auto' && (data.running || data.starting);
     if(busy && !stop)return;
     if(action==='auto' && !stop && Date.now()-lastStart<500)return;
     if(action==='auto' && !stop)lastStart=Date.now();

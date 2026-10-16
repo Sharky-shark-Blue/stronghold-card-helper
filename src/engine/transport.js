@@ -319,6 +319,7 @@ export function createSpuiTransport(config, getPlan, chess={}) {
       const response=await ask('sell',{uid,expectedSale:approved,keep:Array.isArray(p.keep) ? p.keep : [],keepRules:p.keepRules || {}});
       return response?.result?.cancelled==='placement' ? null : true;
     },
+    prepare:async expected=>{await ensureLock();return ask('prepare',expected);},
     acquireLock,
     dispose() {
       releaseOwnedLock?.(); disposed = true;

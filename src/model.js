@@ -98,6 +98,7 @@ export function normalizePlan(raw) {
   const itemIconSlots=normalizeIconGrid(p.itemIconSlots,itemOrder);
   return {
     schema: 3,
+    autoReady:{funds:p.autoReady?.funds===null?null:Number.isSafeInteger(p.autoReady?.funds)&&p.autoReady.funds>=0?p.autoReady.funds:0,skipTenth:p.autoReady?.skipTenth===true},
     ...(p.itemBuyingPaused === true ? { itemBuyingPaused: true } : {}),
     active: kindOf(p.active), buy, keep, locks,
     customOperators: records.filter(rec => referenced.has(rec.id)),

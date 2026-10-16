@@ -1,6 +1,6 @@
-// Generated local runtime v0.3.0; edit src/runtime-host.js and src/engine/.
+// Generated local runtime v0.3.1; edit src/runtime-host.js and src/engine/.
 (() => {
-const BUILD_VERSION="0.3.0";
+const BUILD_VERSION="0.3.1";
 // Generated from 全静态条目ID索引.txt (items.json). Base IDs only: 普通 _e_a and special IDs; 升级 _e_b variants map to the same item name.
 const ITEM_CATALOGUE = Object.freeze([
   {"id":"chess_item_3_04_e_a","name":"炎国短刀","tier":3},
@@ -202,6 +202,7 @@ function normalizePlan(raw) {
   const itemIconSlots=normalizeIconGrid(p.itemIconSlots,itemOrder);
   return {
     schema: 3,
+    autoReady:{funds:p.autoReady?.funds===null?null:Number.isSafeInteger(p.autoReady?.funds)&&p.autoReady.funds>=0?p.autoReady.funds:0,skipTenth:p.autoReady?.skipTenth===true},
     ...(p.itemBuyingPaused === true ? { itemBuyingPaused: true } : {}),
     active: kindOf(p.active), buy, keep, locks,
     customOperators: records.filter(rec => referenced.has(rec.id)),
@@ -3078,6 +3079,7 @@ function createSpuiTransport(config, getPlan, chess={}) {
       const response=await ask('sell',{uid,expectedSale:approved,keep:Array.isArray(p.keep) ? p.keep : [],keepRules:p.keepRules || {}});
       return response?.result?.cancelled==='placement' ? null : true;
     },
+    prepare:async expected=>{await ensureLock();return ask('prepare',expected);},
     acquireLock,
     dispose() {
       releaseOwnedLock?.(); disposed = true;
@@ -3331,6 +3333,71 @@ function isLiveItemPause(before, after) {
   return JSON.stringify(mask(a))===JSON.stringify(mask(b));
 }
 
+// Independent endless-mode ready scheduler. Never arms on load or retries an uncertain round.
+function createAutoReady({read,getOptions,available,tradeBusy,handoff,acquireLock,prepare,claim,audit,onStatus}) {
+  let running=false,busy=false,generation=0,timer=null,owner='',stable='',stableAt=0,lastMessage='已关闭';
+  const attempted=new Set();
+  const who=s=>`${s?.room?.code || ''}|${s?.me?.playerId || ''}`;
+  function report(message){lastMessage=message;onStatus?.({readyRunning:running,readyBusy:busy,readyMessage:message});}
+  function stop(message='已关闭自动准备；已发出的准备指令仍可能生效'){
+    running=false;generation++;clearInterval(timer);timer=null;stable='';report(message);
+  }
+  function valid(s){return s?.connection?.status==='online' && !s?.ui?.buildStale && s?.readySupported===true &&
+    s?.match?.private?.alive===true && s?.room?.inMatch===true && typeof s.room.code==='string' && typeof s?.me?.playerId==='string' &&
+    s.room.seats?.some(x=>x?.playerId===s.me.playerId) && s?.match?.private?.alive!==false &&
+    s?.match?.public?.players?.some(x=>x?.playerId===s.me.playerId && x.autoplay!==true);}
+  async function tick(){
+    if(!running || busy)return;
+    let release=null,dispatch=false;
+    const ticket=generation;
+    try{
+      const s=read();
+      if(!available() || !valid(s) || who(s)!==owner){stop('自动准备已停止：连接、自检、座位或对局状态变化');return;}
+      const p=s.match.private,pub=s.match.public,o=getOptions();
+      if(o.confirmed===false){stable='';report('等待准备设置保存');return;}
+      if(pub.phase!=='PREP'){stable='';report('等待下一次整备');return;}
+      if(!Number.isSafeInteger(pub.round) || pub.round<1 || !Number.isSafeInteger(p.funds) || p.funds<0){stop('回合或资金状态无效，自动准备已停止');return;}
+      if(p.ready===true){report('本回合已准备，等待下一回合');return;}
+      if(p.ready!==false){stop('准备状态不明确，自动准备已停止');return;}
+      if(o.skipTenth && pub.round%10===0){stable='';report(`第 ${pub.round} 回合跳过，等待你手动准备`);return;}
+      if(o.funds!==null && p.funds>o.funds){stable='';report(`等待资金 ≤ ${o.funds}（当前 ${p.funds}）`);return;}
+      if(p.shop?.rewardOffer?.slots?.length || !Array.isArray(p.temp) || p.temp.length){stable='';report('等待处理奖励或临时区');return;}
+      if(tradeBusy()){stable='';report('等待在途交易核对完成');return;}
+      const identity=`${owner}|${pub.round}`,key=`${o.epoch}|${identity}`,stamp=JSON.stringify(p),quiet=key+'|'+stamp+'|'+JSON.stringify([o.funds,o.skipTenth]);
+      if(attempted.has(key)){report('本回合已尝试准备，不重复发送');return;}
+      if(stable!==quiet){stable=quiet;stableAt=Date.now();report('条件已满足，等待状态稳定');return;}
+      if(Date.now()-stableAt<750)return;
+      busy=true;report('正在核对并提交准备');
+      // Stop only after every condition is met; no new trades may start during this handoff.
+      handoff();release=await acquireLock();
+      if(!running || generation!==ticket)return;
+      const latest=read(),now=getOptions();
+      if(!available() || !valid(latest) || who(latest)!==owner || latest.match.public.phase!=='PREP' ||
+        latest.match.public.round!==pub.round || JSON.stringify(latest.match.private)!==stamp ||
+        now.confirmed===false || now.epoch!==o.epoch || now.funds!==o.funds || now.skipTenth!==o.skipTenth || tradeBusy())throw new Error('提交前状态或设置改变，本次未准备');
+      await audit('ready_request',`自动准备：第 ${pub.round} 回合，资金 ${p.funds}`);
+      if(!running || generation!==ticket)return;
+      const fresh=await claim(key);attempted.add(key);if(attempted.size>128)attempted.delete(attempted.values().next().value);
+      if(!fresh){report('本回合已有准备记录，不重复发送');return;}
+      if(!running || generation!==ticket)return;
+      const finalOptions=getOptions();
+      if(!available() || !valid(read()) || finalOptions.confirmed===false || finalOptions.epoch!==o.epoch || finalOptions.funds!==o.funds || finalOptions.skipTenth!==o.skipTenth)throw new Error('准备设置已变化；本轮不重试');
+      dispatch=true;
+      await prepare({identity,stamp,maximumFunds:o.funds,skipTenth:o.skipTenth});
+      await audit('ready_ok',`第 ${pub.round} 回合准备已确认`);
+      if(running && generation===ticket)report('已准备，等待下一回合');
+    }catch(error){stop(`${error?.message || '自动准备异常'}${dispatch?'；指令可能已生效，本轮不重试':''}`);}
+    finally{release?.();if(busy){busy=false;report(lastMessage);}}
+  }
+  function start(){
+    if(busy)throw new Error('上一笔准备尚未核对完成');
+    if(!available() || !valid(read()))throw new Error('准备接口、自检、座位或连接未就绪');
+    owner=who(read());running=true;generation++;stable='';report('已手动开启自动准备（无尽用）');
+    clearInterval(timer);timer=setInterval(()=>void tick(),400);void tick();
+  }
+  return {start,stop,get running(){return running;},get busy(){return busy;}};
+}
+
 // Native quick controls. No game commands, plan storage or HTML supplied by the page.
 // Visual references only: shadcn/ui and Animate UI (MIT). No vendor runtime is bundled.
 const QUICK_CHIBI_ICON="data:image/webp;base64,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";
@@ -3354,8 +3421,9 @@ function createQuickDock(options) {
   }});
   const auto=createQuickWindow({...options,kind:'auto',storage:scoped('auto')});
   const items=createQuickWindow({...options,kind:'items',storage:scoped('items')});
-  const each=(kind,action)=>{if(kind==='auto')auto[action]();else if(kind==='items')items[action]();else{auto[action]();items[action]();}};
-  return {update(value){auto.update(value);items.update(value);},show(kind){each(kind,'show');},hide(kind){each(kind,'hide');},destroy(){auto.destroy();items.destroy();}};
+  const ready=createQuickWindow({...options,kind:'ready',storage:scoped('ready')});
+  const each=(kind,action)=>{if(kind==='auto')auto[action]();else if(kind==='items')items[action]();else if(kind==='ready')ready[action]();else{auto[action]();items[action]();ready[action]();}};
+  return {update(value){auto.update(value);items.update(value);ready.update(value);},show(kind){each(kind,'show');},hide(kind){each(kind,'hide');},destroy(){auto.destroy();items.destroy();ready.destroy();}};
 }
 function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly=true,kind}) {
   const doc=parent.ownerDocument || document, win=doc.defaultView;
@@ -3388,11 +3456,11 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
 
 @keyframes quick-body-in{from{opacity:0;translate:0 -4px}to{opacity:1;translate:0 0}}@keyframes quick-arrive{from{opacity:0;translate:0 7px}to{opacity:1;translate:0 0}}@media(prefers-reduced-motion:reduce){.quick-dock,.quick-dock *,.quick-dock :before{animation:none!important;transition:none!important}}
 `;
-  const root=doc.createElement('section');root.className='quick-dock';root.hidden=true;root.dataset.kind=kind;root.setAttribute('aria-label',kind==='auto'?'倒转开关悬浮窗':'道具抓取开关悬浮窗');
-  root.innerHTML=`<header class="quick-head"><div class="quick-grip" tabindex="0" title="拖动此窗口；方向键微调"><span class="quick-mark" aria-hidden="true"></span><div><div class="quick-title">${kind==='auto'?'倒转开关':'道具抓取开关'}</div><div class="quick-state"><i class="quick-led"></i><span class="quick-state-label">未连接</span></div></div></div>${kind==='auto'?'<button class="quick-run" data-quick="auto" type="button" aria-label="启动自动倒转">启动</button>':''}<button class="quick-icon-button quick-fold" data-quick="fold" type="button" title="收起此窗口" aria-expanded="true">−</button><button class="quick-icon-button" data-quick="hide" type="button" title="仅关闭此窗口，不改变运行或抓取设置" aria-label="关闭此悬浮窗">×</button></header><div class="quick-body">${kind==='items'?'<div class="quick-master"><div><div class="quick-caption">道具抓取总开关</div><div class="quick-description">保留各项配置与计数</div></div><button type="button" class="quick-switch" role="switch" data-quick="master" aria-label="道具抓取总开关" aria-checked="true"></button></div><div class="quick-section-label"><span>单件道具</span><span class="quick-item-total">0 项</span></div><div class="quick-items"></div><div class="quick-empty">先在主面板添加道具</div>':''}<div class="quick-bottom"><button class="quick-open" type="button" data-quick="panel">打开主面板 ↗</button><span class="quick-counts"></span></div><div class="quick-feedback" role="status" aria-live="polite"></div></div>`;
+  const root=doc.createElement('section');root.className='quick-dock';root.hidden=true;root.dataset.kind=kind;root.setAttribute('aria-label',kind==='ready'?'自动准备悬浮窗':kind==='auto'?'倒转开关悬浮窗':'道具抓取开关悬浮窗');
+  root.innerHTML=`<header class="quick-head"><div class="quick-grip" tabindex="0" title="拖动此窗口；方向键微调"><span class="quick-mark" aria-hidden="true"></span><div><div class="quick-title">${kind==='ready'?'自动准备 · 无尽':kind==='auto'?'倒转开关':'道具抓取开关'}</div><div class="quick-state"><i class="quick-led"></i><span class="quick-state-label">未连接</span></div></div></div>${kind!=='items'?'<button class="quick-run" data-quick="'+(kind==='ready'?'ready':'auto')+'" type="button">启动</button>':''}<button class="quick-icon-button quick-fold" data-quick="fold" type="button" title="收起此窗口" aria-expanded="true">−</button><button class="quick-icon-button" data-quick="hide" type="button" title="仅关闭此窗口，不改变运行或抓取设置" aria-label="关闭此悬浮窗">×</button></header><div class="quick-body">${kind==='ready'?'<div class="quick-master"><div><div class="quick-caption">每十回合不准备</div><div class="quick-description">跳过第10、20、30…回合</div></div><button class="quick-switch" type="button" role="switch" data-quick="ready-skip" aria-label="每十回合不自动准备" aria-checked="false"></button></div><p class="quick-ready-condition quick-description"></p>':''}${kind==='items'?'<div class="quick-master"><div><div class="quick-caption">道具抓取总开关</div><div class="quick-description">保留各项配置与计数</div></div><button type="button" class="quick-switch" role="switch" data-quick="master" aria-label="道具抓取总开关" aria-checked="true"></button></div><div class="quick-section-label"><span>单件道具</span><span class="quick-item-total">0 项</span></div><div class="quick-items"></div><div class="quick-empty">先在主面板添加道具</div>':''}<div class="quick-bottom"><button class="quick-open" type="button" data-quick="panel">打开主面板 ↗</button><span class="quick-counts"></span></div><div class="quick-feedback" role="status" aria-live="polite"></div></div>`;
   parent.append(css,root);
   const $=s=>root.querySelector(s), grip=$('.quick-grip'), list=$('.quick-items'), rows=new Map();
-  let data={items:[],running:false,starting:false,ready:false,eligible:false}, state={x:Math.max(8,win.innerWidth-(kind==='auto' && win.innerWidth>=600?584:292)),y:kind==='items' && win.innerWidth<600?340:88,collapsed:false,visible:false};
+  let data={items:[],running:false,starting:false,ready:false,eligible:false}, state={x:Math.max(8,win.innerWidth-(kind!=='items' && win.innerWidth>=600?584:292)),y:kind==='ready'?260:kind==='items' && win.innerWidth<600?340:88,collapsed:false,visible:false};
   let destroyed=false, drag=null, busy=0, touched=0, saveTimer=null, lastStart=0;
   const clamp=n=>Math.max(8,n);
   function place(){
@@ -3406,7 +3474,13 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
   function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=null;void Promise.resolve().then(()=>storage?.set({...state})).catch(()=>{if(!destroyed)$('.quick-feedback').textContent='悬浮位置未保存';});},180);}
   function text(node,value){if(node.textContent!==String(value))node.textContent=String(value);}
   function controls(){
-    const run=data.running || data.starting;root.dataset.running=String(kind==='auto'?run:!data.paused && data.uiReady);root.dataset.busy=String(busy>0);
+    const run=data.running || data.starting;root.dataset.running=String(kind==='ready'?!!data.readyRunning:kind==='auto'?run:!data.paused && data.uiReady);root.dataset.busy=String(busy>0);
+    if(kind==='ready'){
+      const button=$('.quick-run');text(button,data.readyRunning?'关闭':'开启');button.setAttribute('aria-label',data.readyRunning?'关闭自动准备':'手动开启自动准备');button.disabled=!data.readyRunning&&(busy>0||!data.readyReady);
+      text($('.quick-state-label'),data.readyMessage || '已关闭');
+      const skip=$('[data-quick=ready-skip]');skip.setAttribute('aria-checked',String(data.autoReady?.skipTenth===true));skip.disabled=busy>0||!data.uiReady;
+      text($('.quick-ready-condition'),`资金 ${data.autoReady?.funds===null?'不限':'≤ '+(data.autoReady?.funds ?? 0)} · 开关不随布局保存`);return;
+    }
     if(kind==='auto'){
       const button=$('.quick-run');text(button,run?'停止':'启动');button.setAttribute('aria-label',run?'停止自动倒转':'启动自动倒转');
       button.disabled=!run && (busy>0 || !data.ready || !data.eligible);button.title=run?'停止自动倒转':data.eligibility || '手动启动自动倒转';
@@ -3421,7 +3495,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
   function update(next){
     if(destroyed)return;data={...data,...next};data.items=Array.isArray(data.items)?data.items:[];
     text($('.quick-counts'),`购 ${data.bought || 0} · 售 ${data.sold || 0}`);
-    if(kind==='auto'){controls();place();return;}
+    if(kind!=='items'){controls();place();return;}
     const ids=new Set(data.items.map(i=>i.id));for(const [id,row] of rows)if(!ids.has(id)){row.remove();rows.delete(id);}
     for(const [index,item] of data.items.entries()){
       let row=rows.get(item.id);
@@ -3442,8 +3516,8 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
     if(action==='fold'){state.collapsed=!state.collapsed;touched++;place();save();return;}
     if(action==='hide'){state.visible=false;touched++;place();save();return;}
     if(action==='panel'){onOpenPanel();return;}
-    if(kind==='auto' ? action!=='auto' : !['master','item'].includes(action))return;
-    const stop=action==='auto' && (data.running || data.starting);
+    if(kind==='ready'?!['ready','ready-skip'].includes(action):kind==='auto' ? action!=='auto' : !['master','item'].includes(action))return;
+    const stop=action==='ready'&&data.readyRunning || action==='auto' && (data.running || data.starting);
     if(busy && !stop)return;
     if(action==='auto' && !stop && Date.now()-lastStart<500)return;
     if(action==='auto' && !stop)lastStart=Date.now();
@@ -3500,12 +3574,14 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
   const pendingCounts = new Map();
   let matchSyncPending = false;
   let live = { state: 'loading', message: cfg.root ? '正在读取当前网页与运行自检；自动交易未启动' : `${typeof cfg.reason === 'string' && cfg.reason ? cfg.reason.slice(0, 160) : '此页未发现兼容游戏入口'}；可整理名单，不会交易`, running: false, starting: false, bought: 0, sold: 0, kept: 0, refreshed: 0 };
+  let readySettingsStamp='',readyController=null,readyLive={readyRunning:false,readyBusy:false,readyMessage:'已关闭'};
   const quickRequests=new Map();
   const quickKey=`wei.workbench.quickdock.v1:${location.origin}`;
   const quickDock=createQuickDock({parent:shadow,
     storage:{async get(){return (await chrome.storage.local.get(quickKey))[quickKey];},async set(value){await chrome.storage.local.set({[quickKey]:value});}},
     onOpenPanel(){expanded=true;update();},
     onAction(command,id){
+      if(command==='ready' && readyController?.running){readyController.stop();return Promise.resolve({message:'自动准备已关闭'});}
       // Stop is immediate even if the settings iframe or another shortcut ACK is slow.
       if(command==='auto' && (controller?.running || controller?.starting)){
         controller.stop('已通过悬浮开关停止');emit();return Promise.resolve({message:'已停止'});
@@ -3530,7 +3606,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       return {id:item.id,name:Model.ITEMS.find(rec=>rec.id===item.id)?.name || item.name || item.id,
         enabled:item.enabled===true,status,iconUrl:itemGameIcon(gameIcons,rec || {id:real})};
     });
-    return {...runtime,running:controller?.running ?? runtime.running,starting:controller?.starting ?? runtime.starting,uiReady,paused:plan.itemBuyingPaused===true,items};
+    return {...runtime,autoReady:plan.autoReady,running:controller?.running ?? runtime.running,starting:controller?.starting ?? runtime.starting,uiReady,paused:plan.itemBuyingPaused===true,items};
   }
   function post(type, extra = {}) { if (!closed && uiReady) frame.contentWindow?.postMessage({channel:CHANNEL,token,type,...extra},extensionOrigin); }
   // 自选编队 picks are fixed per match by the server (match.private.diy); names come from the game's backups data.
@@ -3550,7 +3626,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       Model.ITEMS.map(item => item.id),gameItems);
     let loadedVersion='不可用',extensionId='不可用';try{loadedVersion=chrome.runtime.getManifest().version;extensionId=chrome.runtime.id.slice(-8);}catch{}
     const randomAvailable=typeof globalThis.crypto?.getRandomValues==='function';
-    return {...live,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
+    return {...live,...readyLive,autoReady:plan.autoReady,readyReady:!!readyController&&auditReady&&!healthError&&state?.readySupported===true,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
       eligible:check.ok,eligibility:check.reason || '本人整备期，可手动启动',matches:mapping.matches,keepCounts,itemOwnedCounts,itemMatches:mapping.itemMatches,useNotes:mapping.useNotes,pending:mapping.pending,issues:mapping.issues,skipped:mapping.skipped,
       health:[`脚本 v${BUILD_VERSION} · 已加载扩展 v${loadedVersion} / ${extensionId} · 服务器 ${location.host}`,`安全随机字节 ${randomAvailable ? '可用' : '不可用，拒绝交易'} · ${isSecureContext ? '安全上下文' : '普通 HTTP 上下文'}`,healthError || (transport ? '网页桥接与扩展后台已连接' : '未连接网页交易接口'),auditReady ? '审计日志可用；运行锁在手动启动时获取' : '审计日志尚未就绪',(garrisons ? '特质图鉴已读取' : '特质图鉴不可用：赠币外的免费奖励需手动选择'),gameItems ? '本服道具数据已读取，可按唯一名称识别图鉴外道具' : '本服道具数据不可用：图鉴外道具维持待识别，已知静态 ID 仍需商店精确匹配',check.reason || '本人整备、库存与 UID 可核对',mapping.issues.length ? mapping.issues.join('；') : mapping.pending.length ? `待识别 ${mapping.pending.length} 项，仅这些条目不自动交易；${mapping.skipped.slice(0,3).join('；')}${mapping.pending.length>3?'；其余见名单':''}` : '已启用的名单可按本服图鉴匹配'],
       gameKeys:gameKeys(),logCount:auditLog?.entries.length || 0,entries:(auditLog?.entries || []).slice(-60)};
@@ -3616,6 +3692,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
   }
   function close() {
     if (closed) return;
+    readyController?.stop('工作台已关闭，自动准备停止');
     controller?.stop('工作台已关闭，自动倒转停止');
     for (const pending of pendingCounts.values()) {clearTimeout(pending.timer);pending.reject(new Error('工作台已关闭，购买次数未确认保存'));}
     pendingCounts.clear();
@@ -3712,8 +3789,16 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
     return {counted:plan.itemSession.epoch===epoch && plan.items.some(item=>item.id===sourceId)};
   }
   async function action(type) {
+    if(type==='ready.stop'){readyController?.stop();return {ok:true};}
+    if(type==='ready.toggle'){
+      if(readyController?.running){readyController.stop();return {ok:true};}
+      if(!readyController || !auditReady || healthError)throw new Error(healthError || '准备接口尚未就绪');
+      await auditLog.append({kind:'ready_start',summary:'手动开启自动准备（无尽用）'});
+      readyController.start();emit();return {ok:true};
+    }
     if (type === 'auto.toggle') {
       if (controller?.running || controller?.starting) {controller.stop();return {ok:true};}
+      if(readyController?.busy)throw new Error('正在提交准备，请等待核对完成');
       await syncObservedMatch(transport?.read());
       if(matchSyncPending)throw new Error('正在保存新对局状态，请稍后手动启动');
       if (!controller || !auditReady || healthError) throw new Error(healthError || '运行自检尚未通过，不能启动');
@@ -3749,7 +3834,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
     const data = event.data;
     if (event.source !== frame.contentWindow || event.origin !== extensionOrigin || !data || data.channel !== CHANNEL || data.token !== token) return;
     if(data.clientVersion !== BUILD_VERSION) return;
-    if(data.type==='quick.open'){if(['auto','items'].includes(data.kind))quickDock.show(data.kind);return;}
+    if(data.type==='quick.open'){if(['auto','items','ready'].includes(data.kind))quickDock.show(data.kind);return;}
     if(data.type==='quick.done' && typeof data.rid==='string'){
       const pending=quickRequests.get(data.rid);if(!pending)return;
       quickRequests.delete(data.rid);clearTimeout(pending.timer);
@@ -3757,8 +3842,9 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       else pending.reject(new Error(typeof data.reason==='string'?data.reason.slice(0,180):'快捷操作未确认'));
       emit();return;
     }
-    if (data.type === 'ui.ready') {uiReady=true;acceptPlan(data.plan, false);emit(true);void syncObservedMatch(transport?.read());return;}
-    if(data.type==='storage.error'){healthError='本地配置保存失败，已停止交易以保护计数';controller?.stop(healthError);emit();return;}
+    if(data.type==='ready.settings'){if(JSON.stringify(data.settings)===JSON.stringify(plan.autoReady))readySettingsStamp=JSON.stringify(plan.autoReady);return;}
+    if (data.type === 'ui.ready') {uiReady=true;acceptPlan(data.plan, false);readySettingsStamp=JSON.stringify(plan.autoReady);emit(true);void syncObservedMatch(transport?.read());return;}
+    if(data.type==='storage.error'){healthError='本地配置保存失败，已停止交易以保护计数';controller?.stop(healthError);readyController?.stop(healthError);emit();return;}
     if (data.type === 'plan') {acceptPlan(data.plan,true,data.liveItemToggle,data.liveItemPause);return;}
     if (data.type === 'count.saved' && typeof data.rid === 'string') {
       const pending=pendingCounts.get(data.rid);if(!pending)return;
@@ -3770,7 +3856,7 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
     if (data.type === 'collapse') { expanded = false; update(); return; }
     if (data.type === 'close') {close();return;}
     if (data.type === 'width' && [360,400,440].includes(data.width)) {width=data.width;update();return;}
-    if (['auto.toggle','health.check','log.read','log.export','log.clear'].includes(data.type) && typeof data.rid==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(data.rid)) {
+    if (['auto.toggle','ready.toggle','ready.stop','health.check','log.read','log.export','log.clear'].includes(data.type) && typeof data.rid==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(data.rid)) {
       void action(data.type).then(result=>post('reply',{rid:data.rid,...result}),error=>{if(data.type==='auto.toggle') {live={...live,state:'blocked',message:error.message};emit();}post('reply',{rid:data.rid,ok:false,reason:error.message});});
     }
   }
@@ -3798,7 +3884,18 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       auditLog=createAuditLog({origin:location.origin,clientVersion:BUILD_VERSION,sendMessage:message=>chrome.runtime.sendMessage(message),onChange:()=>emit(),onError:error=>{healthError=`本地日志不可用：${error.message}`;controller?.stop(healthError);emit();}});
       await auditLog.load();if(closed)return;auditReady=true;
       controller=createAutoController({read:transport.read,subscribe:transport.subscribe,buy:transport.buy,buyItem:transport.buyItem,sell:transport.sell,refresh:transport.refresh,useCoin:transport.useCoin,useItem:transport.useItem,recency:recency.rank,reward:transport.reward,mergeReward:transport.mergeReward,acquireLock:transport.acquireLock,getPlan:()=>resolved().plan,chess,garrisons,gameItems,onRecordPurchase:recordItemCount,onStatus:status=>{live=status;label.textContent=status.running?'运行中':'工作台';emit();},onAudit:entry=>auditLog.append(entry)});
-      transport.setLockLost(reason=>controller.stop(`独占运行锁丢失：${reason}`));recency.observe(transport.read());offState=transport.subscribe(state=>{recency.observe(state);void syncObservedMatch(state);emit();});
+      readyController=createAutoReady({read:transport.read,
+        getOptions:()=>({...plan.autoReady,epoch:plan.itemSession.epoch,confirmed:readySettingsStamp===JSON.stringify(plan.autoReady)}),
+        available:()=>!closed&&uiReady&&auditReady&&!healthError&&!matchSyncPending&&chrome.runtime.getManifest().version===BUILD_VERSION,
+        tradeBusy:()=>!!(controller?.busy||controller?.starting),
+        handoff:()=>controller?.stop('自动准备条件已满足，停止倒转并等待准备'),
+        acquireLock:transport.acquireLock,prepare:transport.prepare,
+        async claim(key){const storageKey=`wei.ready.attempts.v1:${location.origin}`;const saved=(await chrome.storage.local.get(storageKey))[storageKey];
+          if(saved!==undefined && (!Array.isArray(saved)||saved.some(x=>typeof x!=='string')))throw new Error('准备记录格式无效');
+          const entries=saved||[];if(entries.includes(key))return false;await chrome.storage.local.set({[storageKey]:[...entries,key].slice(-128)});return true;},
+        audit:(kind,summary)=>auditLog.append({kind,summary}),
+        onStatus:value=>{readyLive=value;emit();}});
+      transport.setLockLost(reason=>{controller.stop(`独占运行锁丢失：${reason}`);readyController?.stop(`运行锁丢失：${reason}`);});recency.observe(transport.read());offState=transport.subscribe(state=>{recency.observe(state);void syncObservedMatch(state);emit();});
       void syncObservedMatch(transport.read());
       live={...live,state:'idle',message:'已读取当前网页；自动倒转未启动。买入数量与刷新总费用不限；按实价刷新，最小间隔约0.3秒。'};
       emit(true);

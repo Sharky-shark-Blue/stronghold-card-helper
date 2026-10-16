@@ -1,7 +1,7 @@
 import { mountWorkbench } from './ui.js';
 import { STORAGE_KEY } from './model.js';
 const BACKUP_KEY = 'wei.workbench.plan.backup.v1'; // 导入配置前自动备份的上一份配置
-const FRAME_VERSION='0.3.0',CHANNEL='wei-cardkeeper.ui.v1';
+const FRAME_VERSION='0.3.1',CHANNEL='wei-cardkeeper.ui.v1';
 const token = new URLSearchParams(location.hash.slice(1)).get('token');
 const server = new URL(location.href).searchParams.get('server');
 const serverOrigin=server ? new URL(server).origin : '';
@@ -22,7 +22,7 @@ window.addEventListener('message',event=>{
   if(data.type==='quick.action' && typeof data.rid==='string' && /^[a-f0-9]{32}$/.test(data.rid)){
     void Promise.resolve().then(()=>{
       if(!workbench)throw new Error('工作台未就绪');
-      if(!['auto','master','item'].includes(data.command) ||
+      if(!['auto','master','item','ready','ready-skip'].includes(data.command) ||
         (data.command==='item' && (typeof data.id!=='string' || data.id.length>100)))throw new Error('快捷操作无效');
       return workbench.quickAction(data.command,data.id);
     }).then(result=>notify('quick.done',{rid:data.rid,ok:true,message:result?.message || ''}),
@@ -54,6 +54,7 @@ try {
     catalogue,version:FRAME_VERSION,brandUrl:'../图标.png',serverLabel:server ? new URL(server).host : '独立工作台',
     storage:{async get(){const saved=await chrome.storage.local.get([STORAGE_KEY,'spui.cross-server.plan.v1']);return saved[STORAGE_KEY] || saved['spui.cross-server.plan.v1'] || null;},async set(plan){await chrome.storage.local.set({[STORAGE_KEY]:plan});},
       async getBackup(){return (await chrome.storage.local.get(BACKUP_KEY))[BACKUP_KEY] || null;},async setBackup(value){await chrome.storage.local.set({[BACKUP_KEY]:value});}},
+    onReadySettingsSaved:settings=>notify('ready.settings',{settings}),
     onPersistenceError:()=>notify('storage.error'),
     onPlanChange:(plan,meta)=>notify('plan',{plan,liveItemToggle:meta?.liveItemToggle,liveItemPause:meta?.liveItemPause}),onRuntimeAction:request,onQuickOpen:kind=>notify('quick.open',{kind}),onCollapse:()=>notify('collapse'),onClose:()=>notify('close'),onResize:width=>notify('width',{width}),
   });

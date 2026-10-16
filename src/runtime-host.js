@@ -2,6 +2,7 @@ import { createQuickDock, QUICK_CHIBI_ICON } from './quick-dock.js';
 // Runs in the clicked tab's isolated world. UI stays in the extension iframe.
 import * as Model from './model.js';
 import { createAutoController } from './engine/auto-controller.js';
+import { createAutoReady } from './engine/auto-ready.js';
 import { inspectMatch, baseId } from './engine/auto-policy.js';
 import { inspectInventory, countTrackedItemCopies } from './engine/inventory.js';
 import { createSpuiTransport } from './engine/transport.js';
@@ -45,12 +46,14 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
   const pendingCounts = new Map();
   let matchSyncPending = false;
   let live = { state: 'loading', message: cfg.root ? '正在读取当前网页与运行自检；自动交易未启动' : `${typeof cfg.reason === 'string' && cfg.reason ? cfg.reason.slice(0, 160) : '此页未发现兼容游戏入口'}；可整理名单，不会交易`, running: false, starting: false, bought: 0, sold: 0, kept: 0, refreshed: 0 };
+  let readySettingsStamp='',readyController=null,readyLive={readyRunning:false,readyBusy:false,readyMessage:'已关闭'};
   const quickRequests=new Map();
   const quickKey=`wei.workbench.quickdock.v1:${location.origin}`;
   const quickDock=createQuickDock({parent:shadow,
     storage:{async get(){return (await chrome.storage.local.get(quickKey))[quickKey];},async set(value){await chrome.storage.local.set({[quickKey]:value});}},
     onOpenPanel(){expanded=true;update();},
     onAction(command,id){
+      if(command==='ready' && readyController?.running){readyController.stop();return Promise.resolve({message:'自动准备已关闭'});}
       // Stop is immediate even if the settings iframe or another shortcut ACK is slow.
       if(command==='auto' && (controller?.running || controller?.starting)){
         controller.stop('已通过悬浮开关停止');emit();return Promise.resolve({message:'已停止'});
@@ -75,7 +78,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       return {id:item.id,name:Model.ITEMS.find(rec=>rec.id===item.id)?.name || item.name || item.id,
         enabled:item.enabled===true,status,iconUrl:itemGameIcon(gameIcons,rec || {id:real})};
     });
-    return {...runtime,running:controller?.running ?? runtime.running,starting:controller?.starting ?? runtime.starting,uiReady,paused:plan.itemBuyingPaused===true,items};
+    return {...runtime,autoReady:plan.autoReady,running:controller?.running ?? runtime.running,starting:controller?.starting ?? runtime.starting,uiReady,paused:plan.itemBuyingPaused===true,items};
   }
   function post(type, extra = {}) { if (!closed && uiReady) frame.contentWindow?.postMessage({channel:CHANNEL,token,type,...extra},extensionOrigin); }
   // 自选编队 picks are fixed per match by the server (match.private.diy); names come from the game's backups data.
@@ -95,7 +98,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       Model.ITEMS.map(item => item.id),gameItems);
     let loadedVersion='不可用',extensionId='不可用';try{loadedVersion=chrome.runtime.getManifest().version;extensionId=chrome.runtime.id.slice(-8);}catch{}
     const randomAvailable=typeof globalThis.crypto?.getRandomValues==='function';
-    return {...live,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
+    return {...live,...readyLive,autoReady:plan.autoReady,readyReady:!!readyController&&auditReady&&!healthError&&state?.readySupported===true,ready:!matchSyncPending&&!!controller&&auditReady&&!healthError&&randomAvailable&&loadedVersion===BUILD_VERSION,version:BUILD_VERSION,phase:state?.match?.public?.phase || '',round:state?.match?.public?.round,funds:state?.match?.private?.funds,
       eligible:check.ok,eligibility:check.reason || '本人整备期，可手动启动',matches:mapping.matches,keepCounts,itemOwnedCounts,itemMatches:mapping.itemMatches,useNotes:mapping.useNotes,pending:mapping.pending,issues:mapping.issues,skipped:mapping.skipped,
       health:[`脚本 v${BUILD_VERSION} · 已加载扩展 v${loadedVersion} / ${extensionId} · 服务器 ${location.host}`,`安全随机字节 ${randomAvailable ? '可用' : '不可用，拒绝交易'} · ${isSecureContext ? '安全上下文' : '普通 HTTP 上下文'}`,healthError || (transport ? '网页桥接与扩展后台已连接' : '未连接网页交易接口'),auditReady ? '审计日志可用；运行锁在手动启动时获取' : '审计日志尚未就绪',(garrisons ? '特质图鉴已读取' : '特质图鉴不可用：赠币外的免费奖励需手动选择'),gameItems ? '本服道具数据已读取，可按唯一名称识别图鉴外道具' : '本服道具数据不可用：图鉴外道具维持待识别，已知静态 ID 仍需商店精确匹配',check.reason || '本人整备、库存与 UID 可核对',mapping.issues.length ? mapping.issues.join('；') : mapping.pending.length ? `待识别 ${mapping.pending.length} 项，仅这些条目不自动交易；${mapping.skipped.slice(0,3).join('；')}${mapping.pending.length>3?'；其余见名单':''}` : '已启用的名单可按本服图鉴匹配'],
       gameKeys:gameKeys(),logCount:auditLog?.entries.length || 0,entries:(auditLog?.entries || []).slice(-60)};
@@ -161,6 +164,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
   }
   function close() {
     if (closed) return;
+    readyController?.stop('工作台已关闭，自动准备停止');
     controller?.stop('工作台已关闭，自动倒转停止');
     for (const pending of pendingCounts.values()) {clearTimeout(pending.timer);pending.reject(new Error('工作台已关闭，购买次数未确认保存'));}
     pendingCounts.clear();
@@ -257,8 +261,16 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
     return {counted:plan.itemSession.epoch===epoch && plan.items.some(item=>item.id===sourceId)};
   }
   async function action(type) {
+    if(type==='ready.stop'){readyController?.stop();return {ok:true};}
+    if(type==='ready.toggle'){
+      if(readyController?.running){readyController.stop();return {ok:true};}
+      if(!readyController || !auditReady || healthError)throw new Error(healthError || '准备接口尚未就绪');
+      await auditLog.append({kind:'ready_start',summary:'手动开启自动准备（无尽用）'});
+      readyController.start();emit();return {ok:true};
+    }
     if (type === 'auto.toggle') {
       if (controller?.running || controller?.starting) {controller.stop();return {ok:true};}
+      if(readyController?.busy)throw new Error('正在提交准备，请等待核对完成');
       await syncObservedMatch(transport?.read());
       if(matchSyncPending)throw new Error('正在保存新对局状态，请稍后手动启动');
       if (!controller || !auditReady || healthError) throw new Error(healthError || '运行自检尚未通过，不能启动');
@@ -294,7 +306,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
     const data = event.data;
     if (event.source !== frame.contentWindow || event.origin !== extensionOrigin || !data || data.channel !== CHANNEL || data.token !== token) return;
     if(data.clientVersion !== BUILD_VERSION) return;
-    if(data.type==='quick.open'){if(['auto','items'].includes(data.kind))quickDock.show(data.kind);return;}
+    if(data.type==='quick.open'){if(['auto','items','ready'].includes(data.kind))quickDock.show(data.kind);return;}
     if(data.type==='quick.done' && typeof data.rid==='string'){
       const pending=quickRequests.get(data.rid);if(!pending)return;
       quickRequests.delete(data.rid);clearTimeout(pending.timer);
@@ -302,8 +314,9 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       else pending.reject(new Error(typeof data.reason==='string'?data.reason.slice(0,180):'快捷操作未确认'));
       emit();return;
     }
-    if (data.type === 'ui.ready') {uiReady=true;acceptPlan(data.plan, false);emit(true);void syncObservedMatch(transport?.read());return;}
-    if(data.type==='storage.error'){healthError='本地配置保存失败，已停止交易以保护计数';controller?.stop(healthError);emit();return;}
+    if(data.type==='ready.settings'){if(JSON.stringify(data.settings)===JSON.stringify(plan.autoReady))readySettingsStamp=JSON.stringify(plan.autoReady);return;}
+    if (data.type === 'ui.ready') {uiReady=true;acceptPlan(data.plan, false);readySettingsStamp=JSON.stringify(plan.autoReady);emit(true);void syncObservedMatch(transport?.read());return;}
+    if(data.type==='storage.error'){healthError='本地配置保存失败，已停止交易以保护计数';controller?.stop(healthError);readyController?.stop(healthError);emit();return;}
     if (data.type === 'plan') {acceptPlan(data.plan,true,data.liveItemToggle,data.liveItemPause);return;}
     if (data.type === 'count.saved' && typeof data.rid === 'string') {
       const pending=pendingCounts.get(data.rid);if(!pending)return;
@@ -315,7 +328,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
     if (data.type === 'collapse') { expanded = false; update(); return; }
     if (data.type === 'close') {close();return;}
     if (data.type === 'width' && [360,400,440].includes(data.width)) {width=data.width;update();return;}
-    if (['auto.toggle','health.check','log.read','log.export','log.clear'].includes(data.type) && typeof data.rid==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(data.rid)) {
+    if (['auto.toggle','ready.toggle','ready.stop','health.check','log.read','log.export','log.clear'].includes(data.type) && typeof data.rid==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(data.rid)) {
       void action(data.type).then(result=>post('reply',{rid:data.rid,...result}),error=>{if(data.type==='auto.toggle') {live={...live,state:'blocked',message:error.message};emit();}post('reply',{rid:data.rid,ok:false,reason:error.message});});
     }
   }
@@ -343,7 +356,18 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       auditLog=createAuditLog({origin:location.origin,clientVersion:BUILD_VERSION,sendMessage:message=>chrome.runtime.sendMessage(message),onChange:()=>emit(),onError:error=>{healthError=`本地日志不可用：${error.message}`;controller?.stop(healthError);emit();}});
       await auditLog.load();if(closed)return;auditReady=true;
       controller=createAutoController({read:transport.read,subscribe:transport.subscribe,buy:transport.buy,buyItem:transport.buyItem,sell:transport.sell,refresh:transport.refresh,useCoin:transport.useCoin,useItem:transport.useItem,recency:recency.rank,reward:transport.reward,mergeReward:transport.mergeReward,acquireLock:transport.acquireLock,getPlan:()=>resolved().plan,chess,garrisons,gameItems,onRecordPurchase:recordItemCount,onStatus:status=>{live=status;label.textContent=status.running?'运行中':'工作台';emit();},onAudit:entry=>auditLog.append(entry)});
-      transport.setLockLost(reason=>controller.stop(`独占运行锁丢失：${reason}`));recency.observe(transport.read());offState=transport.subscribe(state=>{recency.observe(state);void syncObservedMatch(state);emit();});
+      readyController=createAutoReady({read:transport.read,
+        getOptions:()=>({...plan.autoReady,epoch:plan.itemSession.epoch,confirmed:readySettingsStamp===JSON.stringify(plan.autoReady)}),
+        available:()=>!closed&&uiReady&&auditReady&&!healthError&&!matchSyncPending&&chrome.runtime.getManifest().version===BUILD_VERSION,
+        tradeBusy:()=>!!(controller?.busy||controller?.starting),
+        handoff:()=>controller?.stop('自动准备条件已满足，停止倒转并等待准备'),
+        acquireLock:transport.acquireLock,prepare:transport.prepare,
+        async claim(key){const storageKey=`wei.ready.attempts.v1:${location.origin}`;const saved=(await chrome.storage.local.get(storageKey))[storageKey];
+          if(saved!==undefined && (!Array.isArray(saved)||saved.some(x=>typeof x!=='string')))throw new Error('准备记录格式无效');
+          const entries=saved||[];if(entries.includes(key))return false;await chrome.storage.local.set({[storageKey]:[...entries,key].slice(-128)});return true;},
+        audit:(kind,summary)=>auditLog.append({kind,summary}),
+        onStatus:value=>{readyLive=value;emit();}});
+      transport.setLockLost(reason=>{controller.stop(`独占运行锁丢失：${reason}`);readyController?.stop(`运行锁丢失：${reason}`);});recency.observe(transport.read());offState=transport.subscribe(state=>{recency.observe(state);void syncObservedMatch(state);emit();});
       void syncObservedMatch(transport.read());
       live={...live,state:'idle',message:'已读取当前网页；自动倒转未启动。买入数量与刷新总费用不限；按实价刷新，最小间隔约0.3秒。'};
       emit(true);

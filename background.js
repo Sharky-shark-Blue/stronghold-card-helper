@@ -12,7 +12,7 @@ const LOG_KINDS = new Set([
   'start', 'wait', 'guard', 'buy_request', 'buy_ok', 'item_buy_request', 'item_buy_ok', 'gift', 'keep',
   'sell_request', 'sell_ok', 'refresh_request', 'refresh_ok', 'coin_request', 'coin_ok', 'coin_warn',
   'use_request', 'use_ok', 'use_warn',
-  'reward_request', 'reward_ok', 'pause', 'settings', 'info', 'error',
+  'reward_request', 'reward_ok', 'ready_start', 'ready_request', 'ready_ok', 'pause', 'settings', 'info', 'error',
 ]);
 const queues = new Map();
 function serial(key, fn) {

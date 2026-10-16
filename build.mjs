@@ -29,18 +29,20 @@ const brandUrl = ${JSON.stringify(brand)};
 const launcher = document.querySelector('.launcher');
 const collapse = () => { document.body.classList.add('is-collapsed'); launcher.hidden = false; };
 launcher.addEventListener('click', () => { document.body.classList.remove('is-collapsed'); launcher.hidden = true; });
-let previewDock=null;
+let previewDock=null,previewReady=false,previewRunning=false;
 const previewKey = 'wei.workbench.preview.v1';
 window.weiWorkbench = await mountWorkbench(document.querySelector('#app'), {
   catalogue, brandUrl, version: ${JSON.stringify(manifest.version)}, preview: true, serverLabel: '卫戍协议 · 静态名单快照',
   storage: { async get() { return JSON.parse(localStorage.getItem(previewKey) || 'null'); }, async set(value) { localStorage.setItem(previewKey, JSON.stringify(value)); },
     async getBackup() { return JSON.parse(localStorage.getItem(previewKey + '.backup') || 'null'); }, async setBackup(value) { localStorage.setItem(previewKey + '.backup', JSON.stringify(value)); } },
+  onRuntimeAction:async type=>{if(type==='ready.toggle')previewReady=!previewReady;else if(type==='ready.stop')previewReady=false;else if(type==='auto.toggle')previewRunning=!previewRunning;else return {};
+    window.weiWorkbench.updateRuntime({ready:true,readyReady:true,readyRunning:previewReady,readyMessage:previewReady?'离线模拟已开启，不发送准备':'已关闭',running:previewRunning});syncQuickPreview();return {};},
   onPlanChange:()=>{if(previewDock)syncQuickPreview();},onQuickOpen:kind=>previewDock?.show(kind),onCollapse: collapse, onClose: collapse,
   onResize(width) { document.documentElement.style.setProperty('--dock-width', width + 'px'); },
 });
-const syncQuickPreview=()=>{const plan=window.weiWorkbench.getPlan();previewDock?.update({uiReady:true,ready:true,eligible:true,paused:plan.itemBuyingPaused,running:previewRunning,
+const syncQuickPreview=()=>{const plan=window.weiWorkbench.getPlan();previewDock?.update({uiReady:true,ready:true,eligible:true,autoReady:plan.autoReady,readyReady:true,readyRunning:previewReady,readyMessage:previewReady?'离线模拟，不发送准备':'已关闭',paused:plan.itemBuyingPaused,running:previewRunning,
   items:plan.items.map(item=>({id:item.id,name:Model.ITEMS.find(rec=>rec.id===item.id)?.name || item.name || item.id,enabled:item.enabled,status:item.capPaused?'full':item.enabled?'enabled':'disabled'}))});};
-let previewRunning=false;
+
 previewDock=createQuickDock({parent:document.body,onOpenPanel:()=>{document.body.classList.remove('is-collapsed');launcher.hidden=true;},
   onAction:async(command,id)=>{if(command==='auto'){previewRunning=!previewRunning;syncQuickPreview();return {message:'仅预览，不发送游戏操作'};}
     const result=await window.weiWorkbench.quickAction(command,id);syncQuickPreview();return result;},
@@ -48,7 +50,7 @@ previewDock=createQuickDock({parent:document.body,onOpenPanel:()=>{document.body
 syncQuickPreview();
 `;
 if (/<\/script/i.test(script)) throw new Error('Preview script contains an unsafe closing tag');
-const runtimeFiles = ['src/engine/catalogue.js','src/engine/game-icons.js','src/engine/inventory.js','src/engine/placement.js','src/engine/action-overflow.js','src/engine/flametail-flow.js','src/engine/packaging.js','src/engine/trade-audit.js','src/engine/flametail-audit.js','src/engine/auto-policy.js','src/engine/item-policy.js','src/engine/auto-controller.js','src/engine/transport.js','src/engine/audit-log.js','src/engine/plan-adapter.js','src/quick-dock.js','src/runtime-host.js'];
+const runtimeFiles = ['src/engine/catalogue.js','src/engine/game-icons.js','src/engine/inventory.js','src/engine/placement.js','src/engine/action-overflow.js','src/engine/flametail-flow.js','src/engine/packaging.js','src/engine/trade-audit.js','src/engine/flametail-audit.js','src/engine/auto-policy.js','src/engine/item-policy.js','src/engine/auto-controller.js','src/engine/transport.js','src/engine/audit-log.js','src/engine/plan-adapter.js','src/engine/auto-ready.js','src/quick-dock.js','src/runtime-host.js'];
 const placementSource=removeExports(await read('src/engine/placement.js'));
 const overflowSource=removeExports(await read('src/engine/action-overflow.js'));
 const flametailFlowSource=removeExports(await read('src/engine/flametail-flow.js'));

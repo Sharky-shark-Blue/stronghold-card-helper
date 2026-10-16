@@ -188,6 +188,12 @@ export async function mountWorkbench(container, options) {
         <div class="settings-group"><label>左侧面板宽度</label><div class="width-options">${[360,400,440].map(w => `<button type="button" data-width="${w}" aria-pressed="false">${w} px</button>`).join('')}</div></div>
         <div class="settings-group density-line"><div><label>紧凑列表</label><p>缩小行距</p></div><button class="switch" type="button" role="switch" data-action="compact" aria-checked="false" aria-label="切换紧凑列表"><span></span></button></div>
         <div class="settings-group density-line"><div><label>仅图标模式</label><p>点击启停，拖动排序</p></div><button class="switch" type="button" role="switch" data-action="icons" aria-checked="false" aria-label="切换仅图标模式"><span></span></button></div>
+        <div class="settings-group auto-ready-settings"><div class="density-line"><div><label>自动准备</label><p>无尽用 · 手动开启，重新打开后默认关闭</p></div><button class="switch" type="button" role="switch" data-action="ready-toggle" aria-checked="false" aria-label="自动准备开关"><span></span></button></div>
+          <label for="ready-funds">资金 ≤ <input id="ready-funds" type="number" min="0" step="1" inputmode="numeric" placeholder="不限" aria-label="自动准备资金上限"> 时自动准备</label><p>默认 0；留空不限资金，持续逐回合自动准备。</p>
+          <div class="density-line"><label>跳过第10、20、30…回合</label><button class="switch" type="button" role="switch" data-action="ready-skip" aria-checked="false" aria-label="每十回合不自动准备"><span></span></button></div>
+          <p id="ready-status" role="status">已关闭</p><button class="tool-button" type="button" data-action="quick-open" data-quick-kind="ready">打开自动准备悬浮窗</button>
+          <p>独立于倒转运行；条件满足后先结束倒转并等待在途交易核对。跳过回合需手动准备，下一回合继续。</p>
+        </div>
         <div class="settings-group hotkey-group"><div class="hotkey-text"><label id="hotkey-title">启停快捷键</label><p id="hotkey-hint">游戏或面板中按键启停；输入文字时不触发。</p></div>
           <div class="hotkey-controls"><button class="hotkey-button" type="button" data-action="hotkey-record" aria-pressed="false" aria-labelledby="hotkey-title" aria-describedby="hotkey-hint"><kbd id="hotkey-label">F8</kbd><span>点击修改</span></button><button class="text-button" type="button" data-action="hotkey-reset">恢复 F8</button><button class="text-button subtle" type="button" data-action="hotkey-off">关闭</button></div>
           <p id="hotkey-error" class="hotkey-error" role="alert" hidden></p></div>
@@ -262,11 +268,13 @@ export async function mountWorkbench(container, options) {
     const snapshot = Model.normalizePlan(plan), ticket = ++revision;
     status('正在保存方案…', 'saving');
     saveQueue = saveQueue.catch(() => {}).then(() => storage.set(snapshot)).then(() => {
-      persistenceReady = true;
+      persistenceReady = true;options.onReadySettingsSaved?.(snapshot.autoReady);
       if (!destroyed && ticket === revision) status(options.preview ? '预览方案已保存 · 未连接对局' : '本地名单已保存 · 启停状态不保存', 'saved');
     }).catch(() => { persistenceReady=false;options.onPersistenceError?.(); if (!destroyed && ticket === revision) status('存储不可用 · 仅本次界面有效，不能启动', 'error'); });
   }
   function renderRuntime() {
+    const readyButton=$('[data-action=ready-toggle]');readyButton.setAttribute('aria-checked',String(!!runtimeInfo.readyRunning));readyButton.disabled=!!options.onRuntimeAction&&!runtimeInfo.readyReady&&!runtimeInfo.readyRunning;
+    $('#ready-status').textContent=runtimeInfo.readyMessage || '已关闭';
     const active = !!(runtimeInfo.running || runtimeInfo.starting);
     for(const button of root.querySelectorAll('[data-action=draft]')){button.setAttribute('aria-checked',String(active));button.disabled=!!options.onRuntimeAction&&!runtimeInfo.ready&&!active;button.querySelector('.run-label').textContent=active?'停止':'启动';}
     $('.utility-foot [data-action=draft]').hidden=!active;
@@ -449,7 +457,7 @@ export async function mountWorkbench(container, options) {
   async function runtimeAction(type) {
     if (!options.onRuntimeAction) { toast('离线预览不连接对局，不会执行买卖或刷新。'); return; }
     try {
-      if (type==='auto.toggle' && !runtimeInfo.running && !runtimeInfo.starting) {await saveQueue;if(!persistenceReady)throw new Error('名单尚未可靠保存，不能启动');}
+      if ((type==='auto.toggle' && !runtimeInfo.running && !runtimeInfo.starting)||(type==='ready.toggle' && !runtimeInfo.readyRunning)) {await saveQueue;if(!persistenceReady)throw new Error('名单尚未可靠保存，不能启动');}
       const result=await options.onRuntimeAction(type);
       if (result?.confirm) toast('再次点击“清空此服”确认；仅清除此服务器日志。');
       else if(type==='log-export') toast(`已导出本服务器 ${result.count} 条日志。`);
@@ -547,6 +555,8 @@ export async function mountWorkbench(container, options) {
     for (const button of root.querySelectorAll('[data-width]')) button.setAttribute('aria-pressed', String(Number(button.dataset.width) === plan.width));
     for (const toggle of root.querySelectorAll('[data-action=compact]')) toggle.setAttribute(toggle.getAttribute('role') === 'switch' ? 'aria-checked' : 'aria-pressed', String(plan.compact));
     for (const toggle of root.querySelectorAll('[data-action=icons]')) toggle.setAttribute(toggle.getAttribute('role') === 'switch' ? 'aria-checked' : 'aria-pressed', String(plan.iconOnly));
+    if(document.activeElement!==$('#ready-funds'))$('#ready-funds').value=plan.autoReady.funds===null?'':String(plan.autoReady.funds);
+    $('[data-action=ready-skip]').setAttribute('aria-checked',String(plan.autoReady.skipTenth));
     renderHotkey();
     const locked = new Set(plan.locks[plan.active]), disabled = new Set(plan.disabled[plan.active]);
     const enabled = plan[plan.active].filter(id => !disabled.has(id)).length;
@@ -743,6 +753,7 @@ export async function mountWorkbench(container, options) {
       const messages = { size: '文件太大（超过 1 MB），不是本工具导出的配置。', json: '文件不是有效的 JSON，未导入。', format: '不是卫戍协议拿牌器的配置文件，未导入。', version: '配置文件来自更新版本的卫戍协议拿牌器，请先更新扩展。' };
       configError(messages[result.reason] || '导入失败，当前配置未改变。'); return result;
     }
+    if(runtimeInfo.readyRunning || runtimeInfo.readyBusy){if(!await runtimeAction('ready.stop'))return {ok:false,reason:'ready'};}
     const backup = { savedAt: new Date().toISOString(), config: Model.exportConfig(plan) };
     try { if (storage.setBackup) await storage.setBackup(backup); else memoryBackup = backup; }
     catch { configError('备份当前配置失败，已取消导入。'); return { ok: false, reason: 'backup' }; }
@@ -1170,6 +1181,8 @@ export async function mountWorkbench(container, options) {
       case 'utility-close': modal(null);break;
       case 'selected': change(Model.updateFilter(plan, { enabledOnly: !plan.filters[plan.active].enabledOnly })); break;
       case 'reset-filter': change(Model.updateFilter(plan, { query: '', bond: '', tier: 0, selectedOnly: false, enabledOnly: false })); break;
+      case 'ready-toggle': void runtimeAction('ready.toggle'); break;
+      case 'ready-skip': change({...plan,autoReady:{...plan.autoReady,skipTenth:!plan.autoReady.skipTenth}});break;
       case 'draft': void runtimeAction('auto.toggle'); break;
       case 'health-check': void runtimeAction('health.check'); break;
       case 'log-read': void runtimeAction('log.read'); break;
@@ -1232,6 +1245,10 @@ export async function mountWorkbench(container, options) {
   const itemManualInput = () => {$('#item-manual-error').hidden=true;$('#item-manual-error').textContent='';itemManualName.removeAttribute('aria-invalid');};
   const outsideClick=event=>{if(!root.contains(event.target))closeMenus();};
   document.addEventListener('click',outsideClick); document.addEventListener('keydown',documentHotkey,true);
+  const readyFundsChange=()=>{const value=$('#ready-funds').value.trim(),funds=value===''?null:Number(value);
+    if($('#ready-funds').validity.badInput || funds!==null && (!Number.isSafeInteger(funds)||funds<0)){toast('资金上限请输入非负整数，留空表示不限');$('#ready-funds').value=plan.autoReady.funds===null?'':String(plan.autoReady.funds);return;}
+    change({...plan,autoReady:{...plan.autoReady,funds}});};
+  $('#ready-funds').addEventListener('change',readyFundsChange);
   root.addEventListener('click', click); root.addEventListener('keydown', keydown); root.addEventListener('contextmenu', contextmenu); root.addEventListener('change',itemChange);
   root.addEventListener('load', gameIconLoad, true); root.addEventListener('error', gameIconError, true);
   root.addEventListener('pointerdown', iconPointerDown);
@@ -1251,13 +1268,14 @@ export async function mountWorkbench(container, options) {
     getPlan: () => Model.normalizePlan(plan),
     async quickAction(command,id) {
       if(destroyed)throw new Error('工作台已关闭');
-      if(command==='auto'){
-        const ok=await runtimeAction('auto.toggle');
+      if(command==='auto' || command==='ready'){
+        const ok=await runtimeAction(command==='ready'?'ready.toggle':'auto.toggle');
         if(!ok)throw new Error('未能执行，请查看主面板提示');
         return {message:''};
       }
       if(!persistenceReady)throw new Error('配置未可靠保存，不能切换');
-      if(command==='item'){
+      if(command==='ready-skip'){change({...plan,autoReady:{...plan.autoReady,skipTenth:!plan.autoReady.skipTenth}});}
+      else if(command==='item'){
         const item=plan.items.find(entry=>entry.id===id);
         if(!item)throw new Error('该道具已移除');
         if(itemPurchaseState(item,plan.itemSession.used[item.id] || 0,itemOwnedCount(item.id))==='full')return {message:'已满；快捷开关不会清零次数'};
@@ -1313,6 +1331,7 @@ export async function mountWorkbench(container, options) {
       destroyed = true; feedback.destroy();
       finishIconDrag();
       document.removeEventListener('click',outsideClick); document.removeEventListener('keydown',documentHotkey,true);
+      $('#ready-funds').removeEventListener('change',readyFundsChange);
       root.removeEventListener('click', click); root.removeEventListener('keydown', keydown); root.removeEventListener('contextmenu', contextmenu); root.removeEventListener('change',itemChange);
       root.removeEventListener('load', gameIconLoad, true); root.removeEventListener('error', gameIconError, true);
       root.removeEventListener('pointerdown', iconPointerDown);
