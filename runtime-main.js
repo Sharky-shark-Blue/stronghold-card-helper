@@ -397,6 +397,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
   let disposed = false;
   let offStore = null;
   let busy = false;
+  let manualSupported=false,restoreManual=null;
   const ledger = new Map(); // ONLY fresh UIDs from this bridge's buy/reward may be sold.
   const coinLedger = new Map(); // ONLY a coin produced by this run's Swire buy may be used.
   const placementProtected=new Set();
@@ -409,6 +410,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
     version: cfg.version,
     dispose() {
       disposed = true;
+      restoreManual?.();restoreManual=null;
       if (offStore) offStore();
       if (handleMessage) window.removeEventListener('message', handleMessage);
       ledger.clear(); coinLedger.clear(); pendingReward = null;placementProtected.clear();placementPrevious=null;
@@ -440,7 +442,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
     // 兼容打包版网页（Vite 构建，没有 js/main.js）：游戏自身暴露的 globalThis.__SP__ = {store, net, version:1}
     // 就是界面正在使用的同一份状态与连接；优先使用它。只有旧版网页没有 __SP__ 时才按源码路径导入模块。
     const sp = liveGame();
-    const [{ store }, { actions }, chessRes, garrisonRes, itemsRes] = await Promise.all([
+    const [{ store }, { actions: rawActions }, chessRes, garrisonRes, itemsRes] = await Promise.all([
       sp ? { store: sp.store } : import(new URL('js/store.js', root)),
       sp ? { actions: netActions(sp.net) } : import(new URL('js/ui/gameActions.js', root)),
       fetch(new URL('data/chess.json', root), { cache: 'no-store' }),
@@ -448,6 +450,8 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       fetch(new URL('data/items.json', root), { cache: 'no-store' }).catch(() => null),
     ]);
     if (disposed) return;
+    let ownIntent=0;
+    const actions=Object.fromEntries(Object.entries(rawActions || {}).filter(([,fn])=>typeof fn==='function').map(([key,fn])=>[key,(...args)=>{ownIntent++;try{return fn.apply(rawActions,args);}finally{ownIntent--;}}]));
     if (!store?.get || !store?.subscribe || !actions?.buy || !actions?.sell || !actions?.refresh ||
         !actions?.equip || !actions?.reward || !chessRes.ok) {
       throw new Error('页面不提供兼容的对局状态或买卖接口');
@@ -486,7 +490,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       const s = raw || store.get();
       const room = s?.room, pub = s?.match?.public, p = s?.match?.private;
       return {
-        readySupported:typeof actions.ready==='function',
+        readySupported:typeof actions.ready==='function',manualSupported,
         connection: { status: s?.connection?.status }, ui: { buildStale: s?.ui?.buildStale === true },
         me: { playerId: s?.me?.playerId },
         room: room ? { code: room.code, inMatch: room.inMatch,
@@ -970,7 +974,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
         throw new Error('松果免费选卡的 UID、资金或道具状态无法核对；不会出售');
       }
       const [uid, unit] = fresh[0];
-      ledger.set(uid, { ...unit, identity: ctx.identity, protected: bases(message.keep).has(unit.base) || placementProtected.has(uid) || unit.area==='board' });
+      ledger.set(uid, { ...unit, identity: ctx.identity, protected: proof.manual===true || bases(message.keep).has(unit.base) || placementProtected.has(uid) || unit.area==='board' });
       return { uid, id: unit.id };
     }
     async function pickFlametailMergeReward(message) {
@@ -1007,7 +1011,7 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       }
       const [uid, unit] = fresh[0];
       ledger.set(uid, { ...unit, identity: ctx.identity, surplusGift:proof.kind==='flametail_merge',
-        protected: (proof.kind!=='flametail_merge' && bases(message.keep).has(unit.base)) || placementProtected.has(uid) || unit.area==='board' });
+        protected: proof.manual===true || (proof.kind!=='flametail_merge' && bases(message.keep).has(unit.base)) || placementProtected.has(uid) || unit.area==='board' });
       return { uid, id: unit.id };
     }
     async function sell(message) {
@@ -1092,14 +1096,112 @@ function auditFlametailPurchase(before,after,candidate,options={}) {
       if(!confirmed)throw new Error('准备回执已收到，但状态未确认；不重试');
       return {prepared:true};
     }
+    let manualEnabled=false,manualInFlight=false,manualMonitor=false;
+    let manualSerial=0,manualChain=Promise.resolve();
+    const manualWaiters=new Map();
+    function manualAsk(type,fields){
+      const reply=type==='manual.begin'?'manual.grant':'manual.release';
+      return new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{manualWaiters.delete(fields.rid);reject(new Error('手动操作协调超时；不自动重试'));},45000);
+        manualWaiters.set(fields.rid,{reply,finish:msg=>{clearTimeout(timer);manualWaiters.delete(fields.rid);if(msg.ok===true)resolve(msg);else reject(new Error(msg.reason || '手动操作未能核对'));}});
+        send(type,fields);
+      });
+    }
+    async function runManual(type,fields,extra){
+      if(disposed)throw new Error('工作台已关闭，请重新操作');
+      if(!manualEnabled)return originalRequest.call(nativeNet,type,fields,...extra);
+      const rid=`${nonce}:${++manualSerial}`;
+      let granted=false,completionSent=false,beforeStamp='';
+      manualMonitor=true;
+      try{
+        const gate=await manualAsk('manual.begin',{rid,action:type,fields});
+        if(gate.watch===false)return await originalRequest.call(nativeNet,type,fields,...extra);
+        granted=true;manualInFlight=true;
+        const before=context();beforeStamp=JSON.stringify(view().match.private);
+        if(beforeStamp!==gate.beforeStamp || busy || pendingReward)throw new Error('手动操作前状态或其他请求发生变化；未发送本次请求');
+        const missing=type==='g.sell'?!before.units.has(fields.uid):!before.items.has(fields.itemUid)||!before.units.has(fields.targetUid);
+        let result=null;
+        if(!missing){
+          result=await originalRequest.call(nativeNet,type,fields,...extra);
+          const changed=await waitFor(raw=>{
+            const p=raw?.match?.private;if(!p)return false;
+            const pieces=[...(p.hand || []),...(p.board || []),...(p.temp || [])];
+            return type==='g.sell'?!pieces.some(piece=>piece?.kind==='chess'&&piece.uid===fields.uid):
+              ![...(p.hand || []),...(p.temp || [])].some(piece=>piece?.kind==='item'&&piece.uid===fields.itemUid);
+          });
+          if(!changed)throw new Error('服务器已回执，但手动操作库存未确认');
+        }
+        const after=context({allowReward:true});
+        if(after.identity!==before.identity)throw new Error('手动操作期间还有其他交易或对局变化');
+        if(type==='g.sell'&&!missing){
+          ledger.delete(fields.uid);
+          const offer=after.p.shop.rewardOffer;
+          if(offer?.slots?.length){
+            if(before.units.get(fields.uid)?.id===PINECONE && pineconeOffer(offer))pendingReward={kind:'pinecone',identity:before.identity,stamp:stampOffer(offer),manual:true};
+            else if(isPackagingMergeOffer(offer,chess,after.p.shop.level))pendingReward={kind:'packaging_merge',identity:before.identity,stamp:stampOffer(offer),manual:true};
+          }
+        }
+        if(type==='g.equip'&&!missing){ledger.delete(fields.targetUid);coinLedger.delete(fields.itemUid);placementProtected.add(fields.targetUid);}
+        const afterStamp=JSON.stringify(view().match.private);
+        manualInFlight=false;
+        send('snapshot',{state:view()});
+        completionSent=true;
+        await manualAsk('manual.complete',{rid,action:type,fields,beforeStamp,afterStamp,ok:true,cancelled:missing});
+        return result;
+      }catch(error){
+        manualInFlight=false;
+        if(granted&&!completionSent&&!disposed){
+          send('snapshot',{state:view()});
+          completionSent=true;
+          await manualAsk('manual.complete',{rid,action:type,fields,beforeStamp,ok:false,reason:String(error?.message || error).slice(0,180)}).catch(()=>{});
+        }
+        throw error;
+      }finally{manualInFlight=false;manualMonitor=false;}
+    }
+    let nativeNet=null,originalRequest=null,nativeHook=null;
+    try{
+      nativeNet=sp?.net || (await import(new URL('js/net.js',root))).net;
+      if(disposed)return;
+      if(!nativeNet || typeof nativeNet.request!=='function')throw new Error('未找到原生请求接口');
+      originalRequest=nativeNet.request;
+      nativeHook=function(type,fields={},...extra){
+        // Own intent is marked only during the synchronous call into actions/net.request.
+        // A long-lived async flag would accidentally hide concurrent native clicks.
+        if(ownIntent)return originalRequest.call(this,type,fields,...extra);
+        if(['g.sell','g.equip'].includes(type) && manualEnabled){
+          const allowed=type==='g.sell'?['uid']:['itemUid','targetUid','replaceUid'];
+          const uid=value=>Number.isSafeInteger(value)&&value>=0;
+          if(!fields || typeof fields!=='object' || Object.keys(fields).some(key=>!allowed.includes(key)) ||
+            (type==='g.sell'?!uid(fields.uid):!uid(fields.itemUid)||!uid(fields.targetUid)||fields.replaceUid!=null&&!uid(fields.replaceUid)))return Promise.reject(new Error('手动操作参数不兼容，未发送请求'));
+          const copied={...fields};
+          const job=manualChain.then(()=>runManual(type,copied,extra));
+          manualChain=job.catch(()=>{});return job;
+        }
+        if(manualMonitor && typeof type==='string' && type.startsWith('g.') && !['g.move','g.emote','g.chat'].includes(type))return Promise.reject(new Error('手动出售或装备核对中，请稍后再执行其他操作'));
+        return originalRequest.call(this,type,fields,...extra);
+      };
+      nativeNet.request=nativeHook;
+      if(nativeNet.request!==nativeHook)throw new Error('原生请求接口不可监测');
+      manualSupported=true;
+      restoreManual=()=>{
+        manualEnabled=false;manualSupported=false;
+        if(nativeNet.request===nativeHook)nativeNet.request=originalRequest;
+        for(const waiter of [...manualWaiters.values()])waiter.finish({ok:false,reason:'工作台已关闭，未确认请求不会重试'});
+      };
+    }catch(error){manualSupported=false;console.warn('[wei] 手动操作协调不可用，仍保留未知变化停机保护',error);}
+
     handleMessage = event => {
       const msg = event.data;
       if (event.source !== window || event.origin !== location.origin ||
           msg?.channel !== CHANNEL || msg.side !== 'ui' || msg.nonce !== nonce || msg.version !== cfg.version) return;
       if (msg.type === 'dispose') { ownBridge.dispose(); return; }
       if (msg.type === 'snapshot-request') { send('snapshot', { state: view() }); return; }
+      if(msg.type==='manual.policy'){manualEnabled=msg.enabled===true && manualSupported;return;}
+      if(['manual.grant','manual.release'].includes(msg.type)){
+        const waiter=manualWaiters.get(msg.rid);if(waiter?.reply===msg.type)waiter.finish(msg);return;
+      }
       if (!['buy','buy-item','sell','refresh','coin','use-item','reward','merge-reward','prepare'].includes(msg.type) || typeof msg.rid !== 'string' || msg.rid.length > 100) return;
-      if (busy) { reject(msg.rid, '另一笔交易尚未结束'); return; }
+      if (busy || manualInFlight) { reject(msg.rid, '另一笔交易尚未结束'); return; }
       busy = true;
       (msg.type === 'prepare' ? prepareRound(msg) : msg.type === 'buy' ? buy(msg) : msg.type === 'buy-item' ? buyItem(msg) : msg.type === 'sell' ? sell(msg) :
         msg.type === 'coin' ? useCoin(msg) : msg.type === 'use-item' ? useItem(msg) : msg.type === 'reward' ? pickReward(msg) :

@@ -1,3 +1,4 @@
+import { auditManualTransaction } from './manual-policy.js';
 import { canSellSurplusGift } from './flametail-flow.js';
 import { sameUnitWithPlacement, changedDeployment } from './placement.js';
 import { makeSaleIntent } from './trade-audit.js';
@@ -24,6 +25,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
   let running = false;
   let starting = false;
   let busy = false;
+  let manualContext = null;
   let queued = false;
   let planQueued = false;
   const settingsProtected=new Set(), transactionKeeps=new Set();
@@ -66,7 +68,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     if (kind) void writeAudit(kind, message, {}, state === 'waiting' ? 'info' : 'warn').catch(() => {});
   }
   function releaseIfIdle() {
-    if (!running && !starting && !busy && releaseLock) {
+    if (!running && !starting && !busy && !manualContext && releaseLock) {
       const release = releaseLock; releaseLock = null;
       try { release(); } catch { /* browser lock is released on page close anyway */ }
     }
@@ -172,7 +174,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     });
   }
   function schedule() {
-    if (!running || busy || queued) return;
+    if (!running || busy || queued || manualContext) return;
     queued = true;
     queueMicrotask(() => {
       queued = false;
@@ -722,7 +724,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
   }
 
   async function step() {
-    if (!running || busy) return;
+    if (!running || busy || manualContext) return;
     busy = true;transactionKeeps.clear();
     for(const base of keepBases(getPlan(),chess))transactionKeeps.add(base);
     let again = false;
@@ -964,12 +966,14 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       stop(`自动倒转发生异常：${error?.message || String(error)}`);
     } finally {
       busy = false;
+      if(manualContext?.drain){const drain=manualContext.drain;manualContext.drain=null;drain();}
       releaseIfIdle();
       if (running && (again || planQueued)) { planQueued=false; schedule(); }
     }
   }
 
   async function start() {
+    if (manualContext) { report('blocked','手动操作尚未核对完成，请稍后再开启倒转'); return false; }
     if (running || starting || busy) { report('blocked', '上一笔尚未结束，请稍后再启动'); return false; }
     settingsProtected.clear();transactionKeeps.clear();
     const first = inspectMatch(read(), chess);
@@ -1015,6 +1019,12 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     generation++;
     unsubscribe = subscribe((state, prev) => {
       if (!running) return;
+      if(manualContext?.granted){
+        const snap=inspectMatch(state,chess,{allowReward:true});
+        observePlacement(snap);
+        if(!snap.ok || snap.identity!==identity)stop(snap.reason || '手动操作期间对局变化');
+        return;
+      }
       const snap = inspectMatch(state, chess, { allowReward: allowReward() });
       observePlacement(snap);
       if (!snap.ok || snap.identity !== identity || !rewardAllowed(snap.rewardOffer)) {
@@ -1035,7 +1045,57 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     schedule();
     return true;
   }
-  return { start, stop, updatePlan() {
+  async function beginManual(intent){
+    if(!running)return {watch:false};
+    if(manualContext)throw new Error('上一项手动操作尚未核对');
+    if(!['g.sell','g.equip'].includes(intent?.type) || typeof intent.rid!=='string')throw new Error('手动操作类型无效');
+    const ticket=manualContext={rid:intent.rid,type:intent.type,fields:intent.fields,generation,granted:false,drain:null};
+    try{
+      if(busy)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{ticket.drain=null;reject(new Error('等待在途交易结束超时，手动请求未发送'));},20000);ticket.drain=()=>{clearTimeout(timer);resolve();};});
+      if(!running || ticket.generation!==generation)throw new Error('倒转已停止，手动请求未发送，请重试');
+      const before=inspectMatch(read(),chess);if(!before.ok || before.identity!==identity)throw new Error(before.reason || '手动操作前对局已变化');
+      const stamp=JSON.stringify(read().match.private);
+      await writeAudit('info',intent.type==='g.sell'?'手动出售：等待服务器回执，倒转保持开启':'手动装备：等待服务器回执，倒转保持开启');
+      if(!running || ticket.generation!==generation || JSON.stringify(read()?.match?.private)!==stamp)throw new Error('手动操作前状态变化，请核对后重试');
+      ticket.before=before;ticket.beforeStamp=stamp;ticket.granted=true;
+      ticket.expiry=setTimeout(()=>{if(manualContext===ticket)stop('手动操作回执超时，已停止；请核对游戏，不自动重试');},90000);
+      report('waiting','手动操作核对中，倒转保持开启');return {watch:true,beforeStamp:stamp};
+    }catch(error){if(manualContext===ticket)manualContext=null;stop(error.message);throw error;}
+  }
+  async function completeManual(result){
+    const ticket=manualContext;
+    if(!ticket || ticket.rid!==result.rid)throw new Error('手动操作回执不匹配');
+    if(ticket.completing)throw new Error('手动操作回执已在核对中');
+    ticket.completing=true;
+    try{
+      if(result.ok!==true || ticket.type!==result.type || JSON.stringify(ticket.fields)!==JSON.stringify(result.fields) || ticket.beforeStamp!==result.beforeStamp)throw new Error(result.reason || '手动操作结果不确定');
+      if(ticket.generation!==generation || !running)return {continued:false};
+      const after=inspectMatch(read(),chess,{allowReward:true});
+      if(JSON.stringify(read()?.match?.private)!==result.afterStamp)throw new Error('手动操作之后还有未核对变化');
+      const checked=result.cancelled===true ? {ok:after.ok && ticket.beforeStamp===result.afterStamp,reason:'取消的手动请求之外出现状态变化'} : auditManualTransaction(ticket.before,after,ticket,{chess,gameItems});
+      if(!checked.ok)throw new Error(checked.reason);
+      if(after.rewardOffer){
+        if(checked.soldId===PINECONE_ID && isPineconeOffer(after.rewardOffer,chess))pineconePending=true;
+        else if(checked.packagingReward && isPackagingMergeOffer(after.rewardOffer,chess,after.shopLevel))packagingPending=true;
+        else throw new Error('手动操作产生的奖励来源不能核验，请先人工处理');
+      }
+      let finalStamp=result.afterStamp;
+      if(after.rewardOffer){
+        const taken=pineconePending?await takePineconeReward(after,generation):await takeStrictMergeReward(after,generation,'packaging');
+        if(!taken)throw new Error('手动出售后的免费选卡未能核对');
+        placementProtected.add(taken.unit.uid);
+        finalStamp=JSON.stringify(read()?.match?.private);
+      }
+      if(checked.targetUid!=null)placementProtected.add(checked.targetUid);
+      placementPrevious=inspectMatch(read(),chess);
+      await writeAudit('info',result.cancelled===true?'手动目标已被在途交易处理，未重复发送；继续倒转':ticket.type==='g.sell'?'手动出售已核对，继续倒转':'手动装备已核对，继续倒转');
+      if(ticket.generation===generation && running && JSON.stringify(read()?.match?.private)!==finalStamp)throw new Error('写入手动操作记录期间出现其他变化');
+      return {continued:ticket.generation===generation && running};
+    }catch(error){stop(`手动操作未能安全核对：${error.message}；不重试该操作`);throw error;}
+    finally{clearTimeout(ticket.expiry);if(manualContext===ticket)manualContext=null;releaseIfIdle();if(running)schedule();}
+  }
+
+  return { start, stop, beginManual, completeManual, get manualPending(){return !!manualContext;}, updatePlan() {
     if(!running)return;
     const keep=keepBases(getPlan(),chess), snap=inspectMatch(read(),chess,{allowReward:allowReward()});
     if(snap.ok)for(const unit of snap.units)if(keep.has(unit.base))settingsProtected.add(unit.uid);

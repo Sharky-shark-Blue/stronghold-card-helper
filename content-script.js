@@ -1,6 +1,6 @@
-// Generated local runtime v0.3.1; edit src/runtime-host.js and src/engine/.
+// Generated local runtime v0.3.2; edit src/runtime-host.js and src/engine/.
 (() => {
-const BUILD_VERSION="0.3.1";
+const BUILD_VERSION="0.3.2";
 // Generated from 全静态条目ID索引.txt (items.json). Base IDs only: 普通 _e_a and special IDs; 升级 _e_b variants map to the same item name.
 const ITEM_CATALOGUE = Object.freeze([
   {"id":"chess_item_3_04_e_a","name":"炎国短刀","tier":3},
@@ -1729,6 +1729,62 @@ function auditItemUse(before, after, pick) {
   return { ok: true, consumed: !now, fresh, gain: after.funds - before.funds, reward: !!after.rewardOffer };
 }
 
+
+// Only server-acknowledged native g.sell / g.equip requests enter this audit.
+// An acknowledged request does not excuse unrelated inventory or shop changes.
+function auditManualTransaction(before,after,intent,{chess={},gameItems=null}={}) {
+  const fail=reason=>({ok:false,reason});
+  if(!before?.ok || !after?.ok || before.identity!==after.identity)return fail('手动操作期间对局或回合变化');
+  if(JSON.stringify(before.slots)!==JSON.stringify(after.slots) || before.shopLevel!==after.shopLevel || before.refreshPrice!==after.refreshPrice)return fail('手动操作期间商店发生额外变化');
+  const f=intent?.fields || {};
+  if(intent?.type==='g.sell'){
+    const sold=before.unitByUid.get(f.uid);if(!sold || after.unitByUid.has(f.uid))return fail('手动出售目标UID未确认消失');
+    if(after.funds<before.funds)return fail('手动出售期间资金减少');
+    // The native sale may destroy or return the sold carrier's equipment; it may not move it to another carrier.
+    const equipped=new Set(before.items.filter(item=>item.carrierUid===sold.uid).map(item=>item.uid));
+    for(const uid of equipped){const now=after.itemByUid.get(uid),old=before.itemByUid.get(uid);if(now&&(now.id!==old.id || !['hand','temp'].includes(now.area)))return fail('已出售干员的装备去向异常');}
+    const filter=snap=>({...snap,items:snap.items.filter(item=>!equipped.has(item.uid)),itemByUid:new Map(snap.items.filter(item=>!equipped.has(item.uid)).map(item=>[item.uid,item]))});
+    const checked=auditPackagingSale(filter(before),filter(after),sold.uid,{chess,gameItems});
+    return checked.ok?{...checked,soldUid:sold.uid,soldId:sold.id}:checked;
+  }
+  if(intent?.type!=='g.equip')return fail('不允许此类手动变化');
+  const item=before.itemByUid.get(f.itemUid),target=before.unitByUid.get(f.targetUid);
+  if(!item || !target || !['hand','temp'].includes(item.area))return fail('手动装备来源或目标UID不明确');
+  const body=gameItems?.items || gameItems;
+  const lookup=id=>Array.isArray(body)?body.find(rec=>rec?.id===id):body?.[id];
+  const rule=itemUseRule(item.id,lookup);
+  if(rule?.usable){
+    const checked=auditItemUse(before,after,{item,target,rule});
+    if(!checked.ok)return checked;
+    if(checked.fresh.length && !rule.destroysCarrier && !rule.promotes)return fail('消耗品产生了尚不能核验的额外干员');
+    if(after.items.some(next=>!before.itemByUid.has(next.uid)))return fail('消耗品产生了未核验的新道具');
+    for(const old of before.units){const next=after.unitByUid.get(old.uid);if(!next)continue;
+      const promoted=old.uid===target.uid && rule.promotes && next.id===chess[old.id]?.goldenId && next.golden;
+      if(!promoted && (next.id!==old.id || next.golden!==old.golden))return fail('使用道具时旧干员发生未知变形');
+    }
+    for(const old of before.items){if(old.uid===item.uid)continue;const next=after.itemByUid.get(old.uid);
+      if(old.area==='equipped' && !after.unitByUid.has(old.carrierUid)){
+        if(!next || !['hand','temp'].includes(next.area))return fail('被消耗干员的旧装备去向不明');
+      }else if(!next || (old.area==='equipped' || next.area==='equipped') && (old.area!==next.area || old.carrierUid!==next.carrierUid))return fail('使用道具时其他装备发生变化');
+    }
+    const kept=after.itemByUid.get(item.uid);if(kept && kept.id!==item.id)return fail('使用道具后源装备ID变化');
+    return {...checked,targetUid:target.uid,consumable:true};
+  }
+  const now=after.itemByUid.get(item.uid),carrier=after.unitByUid.get(target.uid);
+  if(!now || now.id!==item.id || now.area!=='equipped' || now.carrierUid!==target.uid || !carrier || carrier.id!==target.id || carrier.golden!==target.golden)return fail('装备未进入指定干员，或目标出现未知变化');
+  if(before.funds!==after.funds || after.rewardOffer || before.units.length!==after.units.length)return fail('普通装备期间资金、奖励或干员数量发生额外变化');
+  for(const old of before.units){const next=after.unitByUid.get(old.uid);if(!next || next.id!==old.id || next.golden!==old.golden || old.uid!==target.uid && next.equipped!==old.equipped)return fail('装备期间其他干员发生变化');}
+  const lost=[];
+  for(const old of before.items){if(old.uid===item.uid)continue;const next=after.itemByUid.get(old.uid);
+    if(!next){lost.push(old);continue;}
+    if(next.id!==old.id || next.area==='equipped' && (old.area!=='equipped'||next.carrierUid!==old.carrierUid) || old.area==='equipped'&&next.area!=='equipped')return fail('装备期间其他道具发生变化');
+  }
+  if(lost.length>1 || lost.some(old=>old.carrierUid!==target.uid || old.uid!==f.replaceUid))return fail('非本次替换目标的装备丢失');
+  if(Number.isInteger(f.replaceUid) && before.itemByUid.has(f.replaceUid) && after.itemByUid.has(f.replaceUid))return fail('指定替换的旧装备未消耗');
+  if(after.items.some(next=>!before.itemByUid.has(next.uid)))return fail('普通装备期间出现额外道具');
+  return {ok:true,targetUid:target.uid};
+}
+
 // Serial, manually armed automation for the clicked game tab on any compatible origin.
 // All buy/sell/refresh requests use the same-origin game store/actions bridge. No server patch is used.
 
@@ -1743,6 +1799,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
   let running = false;
   let starting = false;
   let busy = false;
+  let manualContext = null;
   let queued = false;
   let planQueued = false;
   const settingsProtected=new Set(), transactionKeeps=new Set();
@@ -1785,7 +1842,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     if (kind) void writeAudit(kind, message, {}, state === 'waiting' ? 'info' : 'warn').catch(() => {});
   }
   function releaseIfIdle() {
-    if (!running && !starting && !busy && releaseLock) {
+    if (!running && !starting && !busy && !manualContext && releaseLock) {
       const release = releaseLock; releaseLock = null;
       try { release(); } catch { /* browser lock is released on page close anyway */ }
     }
@@ -1891,7 +1948,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     });
   }
   function schedule() {
-    if (!running || busy || queued) return;
+    if (!running || busy || queued || manualContext) return;
     queued = true;
     queueMicrotask(() => {
       queued = false;
@@ -2441,7 +2498,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
   }
 
   async function step() {
-    if (!running || busy) return;
+    if (!running || busy || manualContext) return;
     busy = true;transactionKeeps.clear();
     for(const base of keepBases(getPlan(),chess))transactionKeeps.add(base);
     let again = false;
@@ -2683,12 +2740,14 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       stop(`自动倒转发生异常：${error?.message || String(error)}`);
     } finally {
       busy = false;
+      if(manualContext?.drain){const drain=manualContext.drain;manualContext.drain=null;drain();}
       releaseIfIdle();
       if (running && (again || planQueued)) { planQueued=false; schedule(); }
     }
   }
 
   async function start() {
+    if (manualContext) { report('blocked','手动操作尚未核对完成，请稍后再开启倒转'); return false; }
     if (running || starting || busy) { report('blocked', '上一笔尚未结束，请稍后再启动'); return false; }
     settingsProtected.clear();transactionKeeps.clear();
     const first = inspectMatch(read(), chess);
@@ -2734,6 +2793,12 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     generation++;
     unsubscribe = subscribe((state, prev) => {
       if (!running) return;
+      if(manualContext?.granted){
+        const snap=inspectMatch(state,chess,{allowReward:true});
+        observePlacement(snap);
+        if(!snap.ok || snap.identity!==identity)stop(snap.reason || '手动操作期间对局变化');
+        return;
+      }
       const snap = inspectMatch(state, chess, { allowReward: allowReward() });
       observePlacement(snap);
       if (!snap.ok || snap.identity !== identity || !rewardAllowed(snap.rewardOffer)) {
@@ -2754,7 +2819,57 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     schedule();
     return true;
   }
-  return { start, stop, updatePlan() {
+  async function beginManual(intent){
+    if(!running)return {watch:false};
+    if(manualContext)throw new Error('上一项手动操作尚未核对');
+    if(!['g.sell','g.equip'].includes(intent?.type) || typeof intent.rid!=='string')throw new Error('手动操作类型无效');
+    const ticket=manualContext={rid:intent.rid,type:intent.type,fields:intent.fields,generation,granted:false,drain:null};
+    try{
+      if(busy)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{ticket.drain=null;reject(new Error('等待在途交易结束超时，手动请求未发送'));},20000);ticket.drain=()=>{clearTimeout(timer);resolve();};});
+      if(!running || ticket.generation!==generation)throw new Error('倒转已停止，手动请求未发送，请重试');
+      const before=inspectMatch(read(),chess);if(!before.ok || before.identity!==identity)throw new Error(before.reason || '手动操作前对局已变化');
+      const stamp=JSON.stringify(read().match.private);
+      await writeAudit('info',intent.type==='g.sell'?'手动出售：等待服务器回执，倒转保持开启':'手动装备：等待服务器回执，倒转保持开启');
+      if(!running || ticket.generation!==generation || JSON.stringify(read()?.match?.private)!==stamp)throw new Error('手动操作前状态变化，请核对后重试');
+      ticket.before=before;ticket.beforeStamp=stamp;ticket.granted=true;
+      ticket.expiry=setTimeout(()=>{if(manualContext===ticket)stop('手动操作回执超时，已停止；请核对游戏，不自动重试');},90000);
+      report('waiting','手动操作核对中，倒转保持开启');return {watch:true,beforeStamp:stamp};
+    }catch(error){if(manualContext===ticket)manualContext=null;stop(error.message);throw error;}
+  }
+  async function completeManual(result){
+    const ticket=manualContext;
+    if(!ticket || ticket.rid!==result.rid)throw new Error('手动操作回执不匹配');
+    if(ticket.completing)throw new Error('手动操作回执已在核对中');
+    ticket.completing=true;
+    try{
+      if(result.ok!==true || ticket.type!==result.type || JSON.stringify(ticket.fields)!==JSON.stringify(result.fields) || ticket.beforeStamp!==result.beforeStamp)throw new Error(result.reason || '手动操作结果不确定');
+      if(ticket.generation!==generation || !running)return {continued:false};
+      const after=inspectMatch(read(),chess,{allowReward:true});
+      if(JSON.stringify(read()?.match?.private)!==result.afterStamp)throw new Error('手动操作之后还有未核对变化');
+      const checked=result.cancelled===true ? {ok:after.ok && ticket.beforeStamp===result.afterStamp,reason:'取消的手动请求之外出现状态变化'} : auditManualTransaction(ticket.before,after,ticket,{chess,gameItems});
+      if(!checked.ok)throw new Error(checked.reason);
+      if(after.rewardOffer){
+        if(checked.soldId===PINECONE_ID && isPineconeOffer(after.rewardOffer,chess))pineconePending=true;
+        else if(checked.packagingReward && isPackagingMergeOffer(after.rewardOffer,chess,after.shopLevel))packagingPending=true;
+        else throw new Error('手动操作产生的奖励来源不能核验，请先人工处理');
+      }
+      let finalStamp=result.afterStamp;
+      if(after.rewardOffer){
+        const taken=pineconePending?await takePineconeReward(after,generation):await takeStrictMergeReward(after,generation,'packaging');
+        if(!taken)throw new Error('手动出售后的免费选卡未能核对');
+        placementProtected.add(taken.unit.uid);
+        finalStamp=JSON.stringify(read()?.match?.private);
+      }
+      if(checked.targetUid!=null)placementProtected.add(checked.targetUid);
+      placementPrevious=inspectMatch(read(),chess);
+      await writeAudit('info',result.cancelled===true?'手动目标已被在途交易处理，未重复发送；继续倒转':ticket.type==='g.sell'?'手动出售已核对，继续倒转':'手动装备已核对，继续倒转');
+      if(ticket.generation===generation && running && JSON.stringify(read()?.match?.private)!==finalStamp)throw new Error('写入手动操作记录期间出现其他变化');
+      return {continued:ticket.generation===generation && running};
+    }catch(error){stop(`手动操作未能安全核对：${error.message}；不重试该操作`);throw error;}
+    finally{clearTimeout(ticket.expiry);if(manualContext===ticket)manualContext=null;releaseIfIdle();if(running)schedule();}
+  }
+
+  return { start, stop, beginManual, completeManual, get manualPending(){return !!manualContext;}, updatePlan() {
     if(!running)return;
     const keep=keepBases(getPlan(),chess), snap=inspectMatch(read(),chess,{allowReward:allowReward()});
     if(snap.ok)for(const unit of snap.units)if(keep.has(unit.base))settingsProtected.add(unit.uid);
@@ -2787,6 +2902,7 @@ function createSpuiTransport(config, getPlan, chess={}) {
   let activeToken = null;
   let disposed = false, releaseOwnedLock = null;
   let lockLost = () => {};
+  let manualHandlers=null;
   const subscribers = new Set();
   const failures = new Set();
   const pending = new Map();
@@ -2816,6 +2932,12 @@ function createSpuiTransport(config, getPlan, chess={}) {
       for (const fn of [...subscribers]) { try { fn(state, previous); } catch (e) { console.error('[spui] 订阅失败', e); } }
     } else if (message.type === 'response' && typeof message.rid === 'string') {
       pending.get(message.rid)?.(message);
+    } else if (['manual.begin','manual.complete'].includes(message.type) && typeof message.rid==='string' && message.rid.length<=100) {
+      const type=message.type==='manual.begin'?'manual.grant':'manual.release';
+      const handler=message.type==='manual.begin'?manualHandlers?.begin:manualHandlers?.complete;
+      Promise.resolve().then(()=>{assertRuntimeVersion();if(typeof handler!=='function')throw new Error('手动操作协调尚未就绪');return handler(message);}).then(
+        result=>{if(!disposed)post(type,{rid:message.rid,ok:true,...result});},
+        error=>{if(!disposed)post(type,{rid:message.rid,ok:false,reason:String(error?.message || error).slice(0,200)});});
     } else if (message.type === 'bridge-error') {
       bridgeError = String(message.reason || '游戏桥接初始化失败');
       for (const fn of [...failures]) fn(bridgeError);
@@ -2905,6 +3027,8 @@ function createSpuiTransport(config, getPlan, chess={}) {
     read: () => state,
     subscribe,
     ready,
+    setManualHandlers: value=>{manualHandlers=value;},
+    setManualEnabled: enabled=>{if(!disposed)post('manual.policy',{enabled:enabled===true});},
     setLockLost: fn => { lockLost = typeof fn === 'function' ? fn : () => {}; },
     buy: async (slot, expected) => {
       if (!expected || typeof expected.id !== 'string' || !Number.isInteger(expected.price)) {
@@ -3082,7 +3206,7 @@ function createSpuiTransport(config, getPlan, chess={}) {
     prepare:async expected=>{await ensureLock();return ask('prepare',expected);},
     acquireLock,
     dispose() {
-      releaseOwnedLock?.(); disposed = true;
+      releaseOwnedLock?.(); disposed = true;manualHandlers=null;
       window.removeEventListener('message', receive);
       for (const callback of [...pending.values()]) callback({ok:false,reason:'工作台已关闭'});
       for (const callback of [...failures]) callback('工作台已关闭');
@@ -3883,11 +4007,11 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
       transport=createSpuiTransport(cfg,()=>resolved().plan,chess);await transport.ready();if(closed) return;
       auditLog=createAuditLog({origin:location.origin,clientVersion:BUILD_VERSION,sendMessage:message=>chrome.runtime.sendMessage(message),onChange:()=>emit(),onError:error=>{healthError=`本地日志不可用：${error.message}`;controller?.stop(healthError);emit();}});
       await auditLog.load();if(closed)return;auditReady=true;
-      controller=createAutoController({read:transport.read,subscribe:transport.subscribe,buy:transport.buy,buyItem:transport.buyItem,sell:transport.sell,refresh:transport.refresh,useCoin:transport.useCoin,useItem:transport.useItem,recency:recency.rank,reward:transport.reward,mergeReward:transport.mergeReward,acquireLock:transport.acquireLock,getPlan:()=>resolved().plan,chess,garrisons,gameItems,onRecordPurchase:recordItemCount,onStatus:status=>{live=status;label.textContent=status.running?'运行中':'工作台';emit();},onAudit:entry=>auditLog.append(entry)});
+      controller=createAutoController({read:transport.read,subscribe:transport.subscribe,buy:transport.buy,buyItem:transport.buyItem,sell:transport.sell,refresh:transport.refresh,useCoin:transport.useCoin,useItem:transport.useItem,recency:recency.rank,reward:transport.reward,mergeReward:transport.mergeReward,acquireLock:transport.acquireLock,getPlan:()=>resolved().plan,chess,garrisons,gameItems,onRecordPurchase:recordItemCount,onStatus:status=>{transport.setManualEnabled(status.running===true);if(!status.running&&controller?.manualPending)readyController?.stop('手动操作尚未核对，自动准备已停止');live=status;label.textContent=status.running?'运行中':'工作台';emit();},onAudit:entry=>auditLog.append(entry)});
       readyController=createAutoReady({read:transport.read,
         getOptions:()=>({...plan.autoReady,epoch:plan.itemSession.epoch,confirmed:readySettingsStamp===JSON.stringify(plan.autoReady)}),
         available:()=>!closed&&uiReady&&auditReady&&!healthError&&!matchSyncPending&&chrome.runtime.getManifest().version===BUILD_VERSION,
-        tradeBusy:()=>!!(controller?.busy||controller?.starting),
+        tradeBusy:()=>!!(controller?.busy||controller?.starting||controller?.manualPending),
         handoff:()=>controller?.stop('自动准备条件已满足，停止倒转并等待准备'),
         acquireLock:transport.acquireLock,prepare:transport.prepare,
         async claim(key){const storageKey=`wei.ready.attempts.v1:${location.origin}`;const saved=(await chrome.storage.local.get(storageKey))[storageKey];
@@ -3895,6 +4019,11 @@ function createQuickWindow({parent,onAction,onOpenPanel,storage=null,trustedOnly
           const entries=saved||[];if(entries.includes(key))return false;await chrome.storage.local.set({[storageKey]:[...entries,key].slice(-128)});return true;},
         audit:(kind,summary)=>auditLog.append({kind,summary}),
         onStatus:value=>{readyLive=value;emit();}});
+      transport.setManualHandlers({
+        begin:message=>{if(closed || readyController?.busy || healthError || !auditReady)throw new Error('当前不能协调手动操作，请等待准备或核对完成');return controller.beginManual({...message,type:message.action});},
+        complete:async message=>{try{return await controller.completeManual({...message,type:message.action});}catch(error){readyController?.stop('手动操作未能核对，自动准备已停止');throw error;}},
+      });
+      transport.setManualEnabled(false);
       transport.setLockLost(reason=>{controller.stop(`独占运行锁丢失：${reason}`);readyController?.stop(`运行锁丢失：${reason}`);});recency.observe(transport.read());offState=transport.subscribe(state=>{recency.observe(state);void syncObservedMatch(state);emit();});
       void syncObservedMatch(transport.read());
       live={...live,state:'idle',message:'已读取当前网页；自动倒转未启动。买入数量与刷新总费用不限；按实价刷新，最小间隔约0.3秒。'};

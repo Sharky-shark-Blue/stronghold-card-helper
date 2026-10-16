@@ -50,7 +50,7 @@ previewDock=createQuickDock({parent:document.body,onOpenPanel:()=>{document.body
 syncQuickPreview();
 `;
 if (/<\/script/i.test(script)) throw new Error('Preview script contains an unsafe closing tag');
-const runtimeFiles = ['src/engine/catalogue.js','src/engine/game-icons.js','src/engine/inventory.js','src/engine/placement.js','src/engine/action-overflow.js','src/engine/flametail-flow.js','src/engine/packaging.js','src/engine/trade-audit.js','src/engine/flametail-audit.js','src/engine/auto-policy.js','src/engine/item-policy.js','src/engine/auto-controller.js','src/engine/transport.js','src/engine/audit-log.js','src/engine/plan-adapter.js','src/engine/auto-ready.js','src/quick-dock.js','src/runtime-host.js'];
+const runtimeFiles = ['src/engine/catalogue.js','src/engine/game-icons.js','src/engine/inventory.js','src/engine/placement.js','src/engine/action-overflow.js','src/engine/flametail-flow.js','src/engine/packaging.js','src/engine/trade-audit.js','src/engine/flametail-audit.js','src/engine/auto-policy.js','src/engine/item-policy.js','src/engine/manual-policy.js','src/engine/auto-controller.js','src/engine/transport.js','src/engine/audit-log.js','src/engine/plan-adapter.js','src/engine/auto-ready.js','src/quick-dock.js','src/runtime-host.js'];
 const placementSource=removeExports(await read('src/engine/placement.js'));
 const overflowSource=removeExports(await read('src/engine/action-overflow.js'));
 const flametailFlowSource=removeExports(await read('src/engine/flametail-flow.js'));

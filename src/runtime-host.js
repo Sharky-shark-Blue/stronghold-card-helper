@@ -355,11 +355,11 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       transport=createSpuiTransport(cfg,()=>resolved().plan,chess);await transport.ready();if(closed) return;
       auditLog=createAuditLog({origin:location.origin,clientVersion:BUILD_VERSION,sendMessage:message=>chrome.runtime.sendMessage(message),onChange:()=>emit(),onError:error=>{healthError=`本地日志不可用：${error.message}`;controller?.stop(healthError);emit();}});
       await auditLog.load();if(closed)return;auditReady=true;
-      controller=createAutoController({read:transport.read,subscribe:transport.subscribe,buy:transport.buy,buyItem:transport.buyItem,sell:transport.sell,refresh:transport.refresh,useCoin:transport.useCoin,useItem:transport.useItem,recency:recency.rank,reward:transport.reward,mergeReward:transport.mergeReward,acquireLock:transport.acquireLock,getPlan:()=>resolved().plan,chess,garrisons,gameItems,onRecordPurchase:recordItemCount,onStatus:status=>{live=status;label.textContent=status.running?'运行中':'工作台';emit();},onAudit:entry=>auditLog.append(entry)});
+      controller=createAutoController({read:transport.read,subscribe:transport.subscribe,buy:transport.buy,buyItem:transport.buyItem,sell:transport.sell,refresh:transport.refresh,useCoin:transport.useCoin,useItem:transport.useItem,recency:recency.rank,reward:transport.reward,mergeReward:transport.mergeReward,acquireLock:transport.acquireLock,getPlan:()=>resolved().plan,chess,garrisons,gameItems,onRecordPurchase:recordItemCount,onStatus:status=>{transport.setManualEnabled(status.running===true);if(!status.running&&controller?.manualPending)readyController?.stop('手动操作尚未核对，自动准备已停止');live=status;label.textContent=status.running?'运行中':'工作台';emit();},onAudit:entry=>auditLog.append(entry)});
       readyController=createAutoReady({read:transport.read,
         getOptions:()=>({...plan.autoReady,epoch:plan.itemSession.epoch,confirmed:readySettingsStamp===JSON.stringify(plan.autoReady)}),
         available:()=>!closed&&uiReady&&auditReady&&!healthError&&!matchSyncPending&&chrome.runtime.getManifest().version===BUILD_VERSION,
-        tradeBusy:()=>!!(controller?.busy||controller?.starting),
+        tradeBusy:()=>!!(controller?.busy||controller?.starting||controller?.manualPending),
         handoff:()=>controller?.stop('自动准备条件已满足，停止倒转并等待准备'),
         acquireLock:transport.acquireLock,prepare:transport.prepare,
         async claim(key){const storageKey=`wei.ready.attempts.v1:${location.origin}`;const saved=(await chrome.storage.local.get(storageKey))[storageKey];
@@ -367,6 +367,11 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
           const entries=saved||[];if(entries.includes(key))return false;await chrome.storage.local.set({[storageKey]:[...entries,key].slice(-128)});return true;},
         audit:(kind,summary)=>auditLog.append({kind,summary}),
         onStatus:value=>{readyLive=value;emit();}});
+      transport.setManualHandlers({
+        begin:message=>{if(closed || readyController?.busy || healthError || !auditReady)throw new Error('当前不能协调手动操作，请等待准备或核对完成');return controller.beginManual({...message,type:message.action});},
+        complete:async message=>{try{return await controller.completeManual({...message,type:message.action});}catch(error){readyController?.stop('手动操作未能核对，自动准备已停止');throw error;}},
+      });
+      transport.setManualEnabled(false);
       transport.setLockLost(reason=>{controller.stop(`独占运行锁丢失：${reason}`);readyController?.stop(`运行锁丢失：${reason}`);});recency.observe(transport.read());offState=transport.subscribe(state=>{recency.observe(state);void syncObservedMatch(state);emit();});
       void syncObservedMatch(transport.read());
       live={...live,state:'idle',message:'已读取当前网页；自动倒转未启动。买入数量与刷新总费用不限；按实价刷新，最小间隔约0.3秒。'};

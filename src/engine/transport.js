@@ -27,6 +27,7 @@ export function createSpuiTransport(config, getPlan, chess={}) {
   let activeToken = null;
   let disposed = false, releaseOwnedLock = null;
   let lockLost = () => {};
+  let manualHandlers=null;
   const subscribers = new Set();
   const failures = new Set();
   const pending = new Map();
@@ -56,6 +57,12 @@ export function createSpuiTransport(config, getPlan, chess={}) {
       for (const fn of [...subscribers]) { try { fn(state, previous); } catch (e) { console.error('[spui] 订阅失败', e); } }
     } else if (message.type === 'response' && typeof message.rid === 'string') {
       pending.get(message.rid)?.(message);
+    } else if (['manual.begin','manual.complete'].includes(message.type) && typeof message.rid==='string' && message.rid.length<=100) {
+      const type=message.type==='manual.begin'?'manual.grant':'manual.release';
+      const handler=message.type==='manual.begin'?manualHandlers?.begin:manualHandlers?.complete;
+      Promise.resolve().then(()=>{assertRuntimeVersion();if(typeof handler!=='function')throw new Error('手动操作协调尚未就绪');return handler(message);}).then(
+        result=>{if(!disposed)post(type,{rid:message.rid,ok:true,...result});},
+        error=>{if(!disposed)post(type,{rid:message.rid,ok:false,reason:String(error?.message || error).slice(0,200)});});
     } else if (message.type === 'bridge-error') {
       bridgeError = String(message.reason || '游戏桥接初始化失败');
       for (const fn of [...failures]) fn(bridgeError);
@@ -145,6 +152,8 @@ export function createSpuiTransport(config, getPlan, chess={}) {
     read: () => state,
     subscribe,
     ready,
+    setManualHandlers: value=>{manualHandlers=value;},
+    setManualEnabled: enabled=>{if(!disposed)post('manual.policy',{enabled:enabled===true});},
     setLockLost: fn => { lockLost = typeof fn === 'function' ? fn : () => {}; },
     buy: async (slot, expected) => {
       if (!expected || typeof expected.id !== 'string' || !Number.isInteger(expected.price)) {
@@ -322,7 +331,7 @@ export function createSpuiTransport(config, getPlan, chess={}) {
     prepare:async expected=>{await ensureLock();return ask('prepare',expected);},
     acquireLock,
     dispose() {
-      releaseOwnedLock?.(); disposed = true;
+      releaseOwnedLock?.(); disposed = true;manualHandlers=null;
       window.removeEventListener('message', receive);
       for (const callback of [...pending.values()]) callback({ok:false,reason:'工作台已关闭'});
       for (const callback of [...failures]) callback('工作台已关闭');
