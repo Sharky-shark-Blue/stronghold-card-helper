@@ -119,7 +119,7 @@ export async function mountWorkbench(container, options) {
     <div class="top-accent"></div>
     <header class="brand">
       <img class="brand-avatar" src="${esc(brandUrl)}" alt="卫戍协议拿牌器图标">
-      <div class="brand-text"><strong>卫戍协议</strong><small>拿牌助手</small></div>
+      <div class="brand-text"><strong>卫戍协议拿牌器</strong></div>
       <div class="header-controls">
         <button class="icon-button" type="button" data-action="quick-open" data-quick-kind="auto" title="倒转开关悬浮窗" aria-label="打开倒转开关悬浮窗">${icon('power')}</button>
         <button class="icon-button" type="button" data-action="quick-open" data-quick-kind="items" title="道具抓取开关悬浮窗" aria-label="打开道具抓取开关悬浮窗">${icon('box')}</button>

@@ -60,7 +60,7 @@ const runtimeSources = await Promise.all(runtimeFiles.map(read));
 const runtimeBody = runtimeSources.map(source => removeExports(source.replace(/^import[\s\S]*?;\r?\n/gm,''))).join('\n');
 await writeFile(path.join(root,'content-script.js'),`// Generated local runtime v${manifest.version}; edit src/runtime-host.js and src/engine/.\n(() => {\nconst BUILD_VERSION=${JSON.stringify(manifest.version)};\n${model}\n${runtimeBody}\n})();\n`,'utf8');
 const html = `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>卫戍协议 · 拿牌助手｜界面预览</title><style>${css}</style></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>卫戍协议拿牌器｜界面预览</title><style>${css}</style></head>
 <body class="preview"><div id="app"></div><button class="launcher" type="button" hidden aria-label="展开卫戍协议拿牌器"><img src="${brand}" alt=""><span>工作台</span></button>
 <main class="preview-stage" aria-label="布局示意，不是真实游戏画面">
   <header class="preview-bar"><img src="${brand}" alt=""><strong>卫戍协议</strong><span>界面预览 · 离线</span></header>
