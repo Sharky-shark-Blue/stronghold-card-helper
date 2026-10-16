@@ -1,0 +1,30 @@
+# Private records, backups and source image collection
+/backups/
+/喵/
+/会话*.txt
+/THEME-SOURCES.md
+/UI-REFERENCES.md
+/pelican-cycle.html
+/assets/
+*.bak
+*.bak_*
+*.log
+*.tmp
+/.preview-capture.html
+
+# Credentials and local settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/.vscode/
+/.idea/
+
+# Generated dependency/cache/test artifacts
+node_modules/
+.cache/
+coverage/
+test/.artifacts/
+.DS_Store
+Thumbs.db

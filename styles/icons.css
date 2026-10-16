@@ -1,0 +1,95 @@
+/* 游戏原生头像 / 道具图标。占位字在图片成功解码前保留，失败时不会出现破图。 */
+.operator-avatar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.operator-avatar .avatar-fallback {
+  line-height: 1;
+  pointer-events: none;
+}
+.operator-avatar .game-icon {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: #18241e;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+.operator-avatar .game-icon.is-loaded { opacity: 1; }
+.operator-avatar.has-game-icon .avatar-fallback { visibility: hidden; }
+.operator-avatar.item-avatar .game-icon {
+  object-fit: contain;
+  padding: 3px;
+  background: #1b2923;
+}
+@media (prefers-reduced-motion: reduce) {
+  .operator-avatar .game-icon { transition: none; }
+}
+
+/* Shared operator/item quick view; compact remains an independent density setting. */
+.workbench.workflow .list-view-modes{display:flex;align-items:center;gap:4px;flex:none;margin-left:auto}
+.workbench.workflow.icon-only #enabled-summary,.workbench.workflow.icon-only #item-enabled-summary{display:none}
+.workbench.workflow.icon-only #operator-rows,.workbench.workflow.icon-only #item-list{--operator-icon-size:44px;display:grid;grid-template-columns:repeat(auto-fill,var(--operator-icon-size));gap:8px;align-content:start;justify-content:start;padding:3px}
+.workbench.workflow.icon-only.compact #operator-rows,.workbench.workflow.icon-only.compact #item-list{--operator-icon-size:36px;gap:6px}
+.workbench.workflow.icon-only #operator-rows>.empty,.workbench.workflow.icon-only #item-list>.empty,.workbench.workflow.icon-only #item-list>.item-empty{grid-column:1/-1}
+.workbench.workflow.icon-only .operator-row.icon-tile{display:grid;place-items:center;position:relative;min-height:var(--operator-icon-size);height:var(--operator-icon-size);width:var(--operator-icon-size);min-width:0;padding:3px;margin:0;gap:0;border:1px solid var(--v-list);border-radius:9px;background:var(--v-surface);box-shadow:none;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-user-drag:none;overflow:hidden}
+.workbench.workflow.icon-only .icon-tile::before,.workbench.workflow.icon-only .icon-tile::after{display:none}
+.workbench.workflow.icon-only .icon-tile .operator-avatar{width:calc(var(--operator-icon-size) - 8px);height:calc(var(--operator-icon-size) - 8px);border:0;border-radius:6px;box-shadow:none;pointer-events:none}
+.workbench.workflow.icon-only .icon-tile.is-disabled{opacity:.8;border-color:var(--v-line-2);background:var(--v-bg)}
+.workbench.workflow.icon-only .icon-tile.is-disabled .operator-avatar{filter:grayscale(1);opacity:.5}
+.workbench.workflow.icon-only .icon-tile:hover{border-color:var(--v-sub)}
+.workbench.workflow.icon-only .icon-tile:focus-visible{outline:2px solid var(--v-list);outline-offset:2px}
+.workbench.workflow.icon-only .icon-tile.is-dragging{opacity:.35;cursor:grabbing}
+.workbench.workflow.icon-only .icon-tile[data-drop-edge="before"]{box-shadow:inset 3px 0 0 var(--v-list)}
+.workbench.workflow.icon-only .icon-tile[data-drop-edge="after"]{box-shadow:inset -3px 0 0 var(--v-list)}
+.workbench.workflow.icon-only .icon-tile.is-drag-ghost{z-index:2147483000;opacity:.96;cursor:grabbing;pointer-events:none;filter:drop-shadow(0 12px 18px rgba(0,0,0,.48));}
+.workbench.workflow.icon-only .icon-drop-placeholder{width:var(--operator-icon-size,44px);height:var(--operator-icon-size,44px);box-sizing:border-box;border:1px dashed color-mix(in srgb,var(--v-list) 78%,transparent);border-radius:10px;background:color-mix(in srgb,var(--v-list) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v-list) 10%,transparent);pointer-events:none;}
+.workbench.workflow.icon-only #operator-rows>.icon-drop-placeholder,.workbench.workflow.icon-only #item-list>.icon-drop-placeholder{min-height:var(--operator-icon-size,44px);}
+.workbench.workflow.icon-only #operator-rows>.icon-tile:not(.is-drag-ghost),.workbench.workflow.icon-only #item-list>.icon-tile:not(.is-drag-ghost){will-change:transform;}
+.workbench.workflow.icon-only .icon-tile.is-drag-ghost .game-icon{-webkit-user-drag:none;}
+@media(prefers-reduced-motion:reduce){.workbench.workflow.icon-only .icon-tile:not(.is-drag-ghost){scroll-behavior:auto!important;}}
+.workbench.workflow.icon-only .item-icon-tile .item-owned-badge{position:absolute;right:0;bottom:0;z-index:1;display:flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border:1px solid color-mix(in srgb,var(--v-list) 75%,var(--v-line));border-radius:999px;background:var(--v-raised);color:var(--v-text);font:700 9px/1 var(--v-font);font-variant-numeric:tabular-nums;box-shadow:0 1px 4px #0008;pointer-events:none;}
+.workbench.workflow.icon-only .item-icon-tile .item-owned-badge[hidden]{display:none!important;}
+
+/* Explicit purchase states: hover and drag must not erase their identity. */
+.workbench.workflow.icon-only .icon-tile:not(.is-disabled):not([data-purchase-state="full"]){border-color:#34d399}
+.workbench.workflow.icon-only .icon-tile.is-disabled{border-color:#f87171}
+.workbench.workflow.icon-only .item-icon-tile[data-purchase-state="enabled"]{border-color:#34d399}
+.workbench.workflow.icon-only .item-icon-tile[data-purchase-state="disabled"]{border-color:#f87171}
+.workbench.workflow.icon-only .icon-tile[data-purchase-state="full"]{border-color:#fbbf24;opacity:1}
+.workbench.workflow.icon-only .icon-tile[data-purchase-state="full"] .operator-avatar{filter:none;opacity:1}
+.workbench.workflow .item-row[data-purchase-state="full"] .row-power{color:#fbbf24;border-color:#fbbf24;opacity:1;cursor:default}
+.workbench.workflow .item-row[data-purchase-state="disabled"] .row-power{color:#f87171}
+.workbench.workflow .item-row[data-purchase-state="enabled"] .row-power{color:#34d399}
+
+.workbench.workflow #keep-item-dock{min-width:0;min-height:0;max-height:none;overflow:visible;border:0;padding:0;margin:0}
+.workbench.workflow.icon-only[data-active="keep"] #operator-panel{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;row-gap:8px}
+.workbench.workflow.icon-only[data-active="keep"] #operator-panel>#operator-rows,.workbench.workflow.icon-only[data-active="keep"] #operator-panel>#keep-item-dock{min-width:0;grid-column:1/-1}
+.workbench.workflow .keep-item-dock-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 3px 7px;color:var(--v-sub);font-size:11px}
+.workbench.workflow .keep-item-dock-heading small{font-size:10px;color:var(--v-faint)}
+.workbench.workflow.icon-only #keep-item-icons{--operator-icon-size:44px;display:grid;grid-template-columns:repeat(auto-fill,var(--operator-icon-size));gap:8px;align-content:start;padding:3px}
+.workbench.workflow.icon-only.compact #keep-item-icons{--operator-icon-size:36px;gap:6px}
+.workbench.workflow.icon-only #keep-item-icons .icon-tile{cursor:grab;touch-action:none}
+
+.workbench.workflow .keep-items-master{margin-left:auto;min-height:26px;padding:3px 10px;border-color:#34d399;color:#34d399;white-space:nowrap}
+.workbench.workflow .keep-items-master[aria-pressed="true"]{border-color:#f87171;color:#f87171;background:rgba(248,113,113,.08)}
+
+/* Sparse grid slots: empty cells remain real destinations, including the quick item dock. */
+.workbench.workflow.icon-only .icon-grid-cell{display:block;width:var(--operator-icon-size,44px);height:var(--operator-icon-size,44px);min-height:var(--operator-icon-size,44px);box-sizing:border-box;border:1px solid transparent;border-radius:9px;background:transparent;pointer-events:auto}
+.workbench.workflow.icon-only .icon-grid-cell.is-filtered-cell{opacity:.25}
+.workbench.workflow.icon-only .is-grid-target{box-shadow:inset 0 0 0 2px var(--v-list)}
+.workbench.workflow.icon-only #keep-item-icons .icon-tile{cursor:grab;touch-action:none}
+.workbench.workflow.icon-only #keep-item-icons .icon-tile:not(.is-drag-ghost){will-change:transform}
+.workbench.workflow.icon-only .icon-drop-placeholder{border-width:2px;background:color-mix(in srgb,var(--v-list) 20%,transparent)}
+
+/* Idle: invisible internal holes, no spare tail. Actual dragging reveals drop cells only. */
+.workbench.workflow.icon-only .icon-grid-cell.is-grid-reserve{display:none}
+.workbench.workflow.icon-only.is-icon-grid-dragging .icon-grid-cell{border:1px dashed color-mix(in srgb,var(--v-line-2) 65%,transparent);background:color-mix(in srgb,var(--v-list) 3%,transparent)}
+.workbench.workflow.icon-only.is-icon-grid-dragging .is-grid-active>.icon-grid-cell.is-grid-reserve{display:block}

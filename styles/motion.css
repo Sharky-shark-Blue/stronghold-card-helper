@@ -1,0 +1,26 @@
+/* Native, local-only micro-interactions. References: shadcn/ui + Animate UI. */
+.workbench.workflow{--motion-fast:140ms;--motion-normal:200ms;--motion-ease:cubic-bezier(.2,.8,.3,1)}
+.workbench.workflow .brand{background-image:linear-gradient(110deg,#291321a1,#170f186b);border-bottom-color:#e6b5c41c}
+.workbench.workflow .brand .header-controls{gap:0}.workbench.workflow .brand .icon-button{width:27px;height:29px}.workbench.workflow .brand-text strong{font-size:14px;letter-spacing:.04em}
+.workbench.workflow .brand-text small{letter-spacing:.1em}
+.workbench.workflow :is(.primary-add,.tool-button,.icon-button,.new-button,.run-button,.tab,.density-toggle,.utility-button){transition:background-color var(--motion-fast),border-color var(--motion-fast),color var(--motion-fast),box-shadow var(--motion-fast),scale var(--motion-fast) var(--motion-ease)}
+.workbench.workflow :is(.primary-add,.run-button):not(:disabled):hover{box-shadow:0 4px 16px #cd819739,inset 0 1px #ffe4ec30}
+.workbench.workflow :is(.primary-add,.run-button,.tool-button):not(:disabled):active{scale:.975}
+.workbench.workflow .tab{position:relative;border:1px solid transparent}
+.workbench.workflow .tab[aria-selected=true]{border-color:#f7ccdf28;box-shadow:inset 0 1px #f7d8e51f,0 3px 9px #0b060e40}
+.workbench.workflow .switch{transition:background-color var(--motion-normal),border-color var(--motion-normal)}
+.workbench.workflow .switch>span{transition:transform var(--motion-normal) var(--motion-ease),background-color var(--motion-normal)}
+.workbench.workflow :is(.settings,.picker,.utility-sheet){animation:workbench-sheet-in 200ms var(--motion-ease)}
+.workbench.workflow :is(.advanced-filter,.action-menu):not([hidden]){animation:workbench-pop-in 150ms var(--motion-ease)}
+.workbench.workflow .toast:not([hidden]){animation:workbench-feedback-in 150ms var(--motion-ease)}
+.workbench.workflow :is(.operator-row,.item-row){transition:background-color var(--motion-fast),border-color var(--motion-fast),box-shadow var(--motion-fast)}
+.workbench.workflow.icon-only .icon-tile:not(.is-drag-ghost){transition:border-color var(--motion-fast),box-shadow var(--motion-fast)}
+.workbench.workflow:not(.is-icon-grid-dragging) .icon-tile:not(.is-drag-ghost):hover{box-shadow:0 0 0 2px #f5d0e013,0 5px 14px #12081555}
+.workbench.workflow .auto-card{box-shadow:inset 0 1px #f4c4d817,0 3px 14px #10061233}
+.workbench.workflow .auto-card:has(.run-button[aria-checked=true]){border-color:#b6d8bc55;background:linear-gradient(115deg,#23382a8c,#211b23dc)}
+.workbench.workflow .save-status .save-dot{transition:background-color var(--motion-normal),box-shadow var(--motion-normal)}
+.workbench.workflow .settings-group{border-color:#d3a5bb1c}.workbench.workflow .utility-bar{border-color:#d3a5bb21}
+@keyframes workbench-sheet-in{from{opacity:0;translate:0 9px}to{opacity:1;translate:0 0}}
+@keyframes workbench-pop-in{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
+@keyframes workbench-feedback-in{from{opacity:0;translate:0 3px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){.workbench.workflow,.workbench.workflow *,.workbench.workflow :before,.workbench.workflow :after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

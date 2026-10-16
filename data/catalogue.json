@@ -1,0 +1,2433 @@
+{
+  "schema": 1,
+  "source": "当前网页全部静态数据原文.zip",
+  "capturedAt": "2026-10-14",
+  "operators": [
+    {
+      "id": "chess_char_1_01_a",
+      "name": "隐现",
+      "charId": "char_498_inside",
+      "tier": 1,
+      "order": 0,
+      "bonds": [
+        "lateranoShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_02_a",
+      "name": "角峰",
+      "charId": "char_199_yak",
+      "tier": 1,
+      "order": 1,
+      "bonds": [
+        "kjeragShip",
+        "steadShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "坚守"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_03_a",
+      "name": "惊蛰",
+      "charId": "char_306_leizi",
+      "tier": 1,
+      "order": 2,
+      "bonds": [
+        "yanShip"
+      ],
+      "bondNames": [
+        "炎"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_04_a",
+      "name": "深巡",
+      "charId": "char_4137_udflow",
+      "tier": 1,
+      "order": 3,
+      "bonds": [
+        "egirShip"
+      ],
+      "bondNames": [
+        "阿戈尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_05_a",
+      "name": "红豆",
+      "charId": "char_290_vigna",
+      "tier": 1,
+      "order": 4,
+      "bonds": [
+        "indomShip"
+      ],
+      "bondNames": [
+        "不屈"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_06_a",
+      "name": "刺玫",
+      "charId": "char_494_vendla",
+      "tier": 1,
+      "order": 5,
+      "bonds": [
+        "victoriaShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "助力"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_07_a",
+      "name": "普罗旺斯",
+      "charId": "char_145_prove",
+      "tier": 1,
+      "order": 6,
+      "bonds": [
+        "siracusaShip"
+      ],
+      "bondNames": [
+        "叙拉古"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_08_a",
+      "name": "德克萨斯",
+      "charId": "char_102_texas",
+      "tier": 1,
+      "order": 7,
+      "bonds": [
+        "soloShip",
+        "siracusaShip"
+      ],
+      "bondNames": [
+        "独行",
+        "叙拉古"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_09_a",
+      "name": "跃跃",
+      "charId": "char_4100_caper",
+      "tier": 1,
+      "order": 8,
+      "bonds": [
+        "preciShip"
+      ],
+      "bondNames": [
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_10_a",
+      "name": "古米",
+      "charId": "char_196_sunbr",
+      "tier": 1,
+      "order": 9,
+      "bonds": [
+        "steadShip"
+      ],
+      "bondNames": [
+        "坚守"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_11_a",
+      "name": "地灵",
+      "charId": "char_183_skgoat",
+      "tier": 1,
+      "order": 10,
+      "bonds": [
+        "miraShip",
+        "visiShip"
+      ],
+      "bondNames": [
+        "奇迹",
+        "远见"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_12_a",
+      "name": "艾丝黛尔",
+      "charId": "char_127_estell",
+      "tier": 1,
+      "order": 11,
+      "bonds": [
+        "sargonShip"
+      ],
+      "bondNames": [
+        "萨尔贡"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_13_a",
+      "name": "波登可",
+      "charId": "char_258_podego",
+      "tier": 1,
+      "order": 12,
+      "bonds": [
+        "deputShip"
+      ],
+      "bondNames": [
+        "助力"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_14_a",
+      "name": "格雷伊",
+      "charId": "char_253_greyy",
+      "tier": 1,
+      "order": 13,
+      "bonds": [
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_15_a",
+      "name": "盟约·辅助干员",
+      "charId": "char_616_pithst",
+      "tier": 1,
+      "order": 14,
+      "bonds": [
+        "maniShip",
+        "emptyShip"
+      ],
+      "bondNames": [
+        "调和",
+        "协防干员"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_16_a",
+      "name": "锡人",
+      "charId": "char_4151_tinman",
+      "tier": 1,
+      "order": 15,
+      "bonds": [
+        "investShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "投资人",
+        "迅捷"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_17_a",
+      "name": "深靛",
+      "charId": "char_469_indigo",
+      "tier": 1,
+      "order": 16,
+      "bonds": [
+        "arcaneShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "奥术",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_18_a",
+      "name": "宴",
+      "charId": "char_337_utage",
+      "tier": 1,
+      "order": 17,
+      "bonds": [
+        "raidShip"
+      ],
+      "bondNames": [
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_19_a",
+      "name": "野鬃",
+      "charId": "char_496_wildmn",
+      "tier": 1,
+      "order": 18,
+      "bonds": [
+        "kazimierzShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_1_20_a",
+      "name": "雷蛇",
+      "charId": "char_107_liskam",
+      "tier": 1,
+      "order": 19,
+      "bonds": [
+        "indomShip"
+      ],
+      "bondNames": [
+        "不屈"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_01_a",
+      "name": "送葬人",
+      "charId": "char_279_excu",
+      "tier": 2,
+      "order": 20,
+      "bonds": [
+        "lateranoShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_02_a",
+      "name": "赫默",
+      "charId": "char_108_silent",
+      "tier": 2,
+      "order": 21,
+      "bonds": [
+        "visiShip"
+      ],
+      "bondNames": [
+        "远见"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_03_a",
+      "name": "崖心",
+      "charId": "char_173_slchan",
+      "tier": 2,
+      "order": 22,
+      "bonds": [
+        "kjeragShip",
+        "indomShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "不屈"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_04_a",
+      "name": "小满",
+      "charId": "char_4122_grabds",
+      "tier": 2,
+      "order": 23,
+      "bonds": [
+        "yanShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "炎",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_05_a",
+      "name": "哈洛德",
+      "charId": "char_4114_harold",
+      "tier": 2,
+      "order": 24,
+      "bonds": [
+        "kjeragShip",
+        "victoriaShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "维多利亚"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_06_a",
+      "name": "莎草",
+      "charId": "char_4139_papyrs",
+      "tier": 2,
+      "order": 25,
+      "bonds": [
+        "sargonShip"
+      ],
+      "bondNames": [
+        "萨尔贡"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_07_a",
+      "name": "幽灵鲨",
+      "charId": "char_143_ghost",
+      "tier": 2,
+      "order": 26,
+      "bonds": [
+        "egirShip"
+      ],
+      "bondNames": [
+        "阿戈尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_08_a",
+      "name": "泡泡",
+      "charId": "char_381_bubble",
+      "tier": 2,
+      "order": 27,
+      "bonds": [
+        "sargonShip",
+        "steadShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "坚守"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_09_a",
+      "name": "休谟斯",
+      "charId": "char_491_humus",
+      "tier": 2,
+      "order": 28,
+      "bonds": [
+        "raidShip"
+      ],
+      "bondNames": [
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_10_a",
+      "name": "洛洛",
+      "charId": "char_4040_rockr",
+      "tier": 2,
+      "order": 29,
+      "bonds": [
+        "victoriaShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_11_a",
+      "name": "风丸",
+      "charId": "char_4016_kazema",
+      "tier": 2,
+      "order": 30,
+      "bonds": [
+        "miraShip"
+      ],
+      "bondNames": [
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_12_a",
+      "name": "砾",
+      "charId": "char_237_gravel",
+      "tier": 2,
+      "order": 31,
+      "bonds": [
+        "kazimierzShip",
+        "indomShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "不屈"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_13_a",
+      "name": "蒂比",
+      "charId": "char_4191_tippi",
+      "tier": 2,
+      "order": 32,
+      "bonds": [
+        "swiftShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "迅捷",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_14_a",
+      "name": "调香师",
+      "charId": "char_181_flower",
+      "tier": 2,
+      "order": 33,
+      "bonds": [
+        "deputShip",
+        "emptyShip"
+      ],
+      "bondNames": [
+        "助力",
+        "协防干员"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_15_a",
+      "name": "协律",
+      "charId": "char_4051_akkord",
+      "tier": 2,
+      "order": 34,
+      "bonds": [
+        "arcaneShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "奥术",
+        "助力"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_16_a",
+      "name": "拉普兰德",
+      "charId": "char_140_whitew",
+      "tier": 2,
+      "order": 35,
+      "bonds": [
+        "siracusaShip"
+      ],
+      "bondNames": [
+        "叙拉古"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_17_a",
+      "name": "折桠",
+      "charId": "char_4207_branch",
+      "tier": 2,
+      "order": 36,
+      "bonds": [
+        "steadShip",
+        "soloShip"
+      ],
+      "bondNames": [
+        "坚守",
+        "独行"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_18_a",
+      "name": "灰毫",
+      "charId": "char_431_ashlok",
+      "tier": 2,
+      "order": 37,
+      "bonds": [
+        "kazimierzShip",
+        "steadShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "坚守"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_2_19_a",
+      "name": "锡人",
+      "charId": "char_4151_tinman",
+      "tier": 2,
+      "order": 38,
+      "bonds": [
+        "investShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "投资人",
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_01_a",
+      "name": "能天使",
+      "charId": "char_103_angel",
+      "tier": 3,
+      "order": 39,
+      "bonds": [
+        "lateranoShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_02_a",
+      "name": "断崖",
+      "charId": "char_294_ayer",
+      "tier": 3,
+      "order": 40,
+      "bonds": [
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_03_a",
+      "name": "诗怀雅",
+      "charId": "char_308_swire",
+      "tier": 3,
+      "order": 41,
+      "bonds": [
+        "yanShip",
+        "visiShip"
+      ],
+      "bondNames": [
+        "炎",
+        "远见"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_04_a",
+      "name": "琳琅诗怀雅",
+      "charId": "char_1033_swire2",
+      "tier": 3,
+      "order": 42,
+      "bonds": [
+        "yanShip",
+        "investShip"
+      ],
+      "bondNames": [
+        "炎",
+        "投资人"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_05_a",
+      "name": "斯卡蒂",
+      "charId": "char_263_skadi",
+      "tier": 3,
+      "order": 43,
+      "bonds": [
+        "egirShip",
+        "steadShip",
+        "raidShip"
+      ],
+      "bondNames": [
+        "阿戈尔",
+        "坚守",
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_06_a",
+      "name": "菲莱",
+      "charId": "char_4148_philae",
+      "tier": 3,
+      "order": 44,
+      "bonds": [
+        "sargonShip"
+      ],
+      "bondNames": [
+        "萨尔贡"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_07_a",
+      "name": "见行者",
+      "charId": "char_4036_forcer",
+      "tier": 3,
+      "order": 45,
+      "bonds": [
+        "lateranoShip"
+      ],
+      "bondNames": [
+        "拉特兰"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_08_a",
+      "name": "薄绿",
+      "charId": "char_388_mint",
+      "tier": 3,
+      "order": 46,
+      "bonds": [
+        "victoriaShip"
+      ],
+      "bondNames": [
+        "维多利亚"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_09_a",
+      "name": "海霓",
+      "charId": "char_4079_haini",
+      "tier": 3,
+      "order": 47,
+      "bonds": [
+        "egirShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "阿戈尔",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_10_a",
+      "name": "松果",
+      "charId": "char_440_pinecn",
+      "tier": 3,
+      "order": 48,
+      "bonds": [
+        "swiftShip",
+        "emptyShip"
+      ],
+      "bondNames": [
+        "迅捷",
+        "协防干员"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_11_a",
+      "name": "雪猎",
+      "charId": "char_4211_snhunt",
+      "tier": 3,
+      "order": 49,
+      "bonds": [
+        "kjeragShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_12_a",
+      "name": "瑕光",
+      "charId": "char_423_blemsh",
+      "tier": 3,
+      "order": 50,
+      "bonds": [
+        "kazimierzShip",
+        "raidShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_13_a",
+      "name": "至简",
+      "charId": "char_4054_malist",
+      "tier": 3,
+      "order": 51,
+      "bonds": [
+        "sargonShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_14_a",
+      "name": "初雪",
+      "charId": "char_174_slbell",
+      "tier": 3,
+      "order": 52,
+      "bonds": [
+        "kjeragShip",
+        "visiShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "远见"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_15_a",
+      "name": "巫恋",
+      "charId": "char_254_vodfox",
+      "tier": 3,
+      "order": 53,
+      "bonds": [
+        "siracusaShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "助力"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_16_a",
+      "name": "蛇屠箱",
+      "charId": "char_150_snakek",
+      "tier": 3,
+      "order": 54,
+      "bonds": [
+        "steadShip",
+        "indomShip"
+      ],
+      "bondNames": [
+        "坚守",
+        "不屈"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_17_a",
+      "name": "流星",
+      "charId": "char_126_shotst",
+      "tier": 3,
+      "order": 55,
+      "bonds": [
+        "kazimierzShip",
+        "soloShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "独行"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_18_a",
+      "name": "忍冬",
+      "charId": "char_4026_vulpis",
+      "tier": 3,
+      "order": 56,
+      "bonds": [
+        "siracusaShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_19_a",
+      "name": "伺夜",
+      "charId": "char_427_vigil",
+      "tier": 3,
+      "order": 57,
+      "bonds": [
+        "siracusaShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_20_a",
+      "name": "耶拉",
+      "charId": "char_4013_kjera",
+      "tier": 3,
+      "order": 58,
+      "bonds": [
+        "kjeragShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "助力"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_3_21_a",
+      "name": "空弦",
+      "charId": "char_332_archet",
+      "tier": 3,
+      "order": 59,
+      "bonds": [
+        "lateranoShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_01_a",
+      "name": "信仰搅拌机",
+      "charId": "char_4194_rmixer",
+      "tier": 4,
+      "order": 60,
+      "bonds": [
+        "lateranoShip",
+        "steadShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "坚守"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_02_a",
+      "name": "莫斯提马",
+      "charId": "char_213_mostma",
+      "tier": 4,
+      "order": 61,
+      "bonds": [
+        "lateranoShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_03_a",
+      "name": "耶拉",
+      "charId": "char_4013_kjera",
+      "tier": 4,
+      "order": 62,
+      "bonds": [
+        "kjeragShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "助力"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_04_a",
+      "name": "伊内丝",
+      "charId": "char_4087_ines",
+      "tier": 4,
+      "order": 63,
+      "bonds": [
+        "visiShip",
+        "raidShip"
+      ],
+      "bondNames": [
+        "远见",
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_05_a",
+      "name": "蜜蜡",
+      "charId": "char_344_beewax",
+      "tier": 4,
+      "order": 64,
+      "bonds": [
+        "sargonShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "助力"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_06_a",
+      "name": "寒芒克洛丝",
+      "charId": "char_1021_kroos2",
+      "tier": 4,
+      "order": 65,
+      "bonds": [
+        "preciShip"
+      ],
+      "bondNames": [
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_07_a",
+      "name": "风笛",
+      "charId": "char_222_bpipe",
+      "tier": 4,
+      "order": 66,
+      "bonds": [
+        "victoriaShip",
+        "visiShip",
+        "indomShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "远见",
+        "不屈"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_08_a",
+      "name": "瑰盐",
+      "charId": "char_4163_rosesa",
+      "tier": 4,
+      "order": 67,
+      "bonds": [
+        "emptyShip"
+      ],
+      "bondNames": [
+        "协防干员"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_09_a",
+      "name": "水月",
+      "charId": "char_437_mizuki",
+      "tier": 4,
+      "order": 68,
+      "bonds": [
+        "egirShip",
+        "soloShip"
+      ],
+      "bondNames": [
+        "阿戈尔",
+        "独行"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_10_a",
+      "name": "阿罗玛",
+      "charId": "char_446_aroma",
+      "tier": 4,
+      "order": 69,
+      "bonds": [
+        "siracusaShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_11_a",
+      "name": "凯瑟琳",
+      "charId": "char_4162_cathy",
+      "tier": 4,
+      "order": 70,
+      "bonds": [
+        "victoriaShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_12_a",
+      "name": "歌蕾蒂娅",
+      "charId": "char_474_glady",
+      "tier": 4,
+      "order": 71,
+      "bonds": [
+        "egirShip"
+      ],
+      "bondNames": [
+        "阿戈尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_13_a",
+      "name": "灵知",
+      "charId": "char_206_gnosis",
+      "tier": 4,
+      "order": 72,
+      "bonds": [
+        "kjeragShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_14_a",
+      "name": "莱恩哈特",
+      "charId": "char_373_lionhd",
+      "tier": 4,
+      "order": 73,
+      "bonds": [
+        "swiftShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "迅捷",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_15_a",
+      "name": "录武官",
+      "charId": "char_4196_reckpr",
+      "tier": 4,
+      "order": 74,
+      "bonds": [
+        "yanShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "炎",
+        "奇迹"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_16_a",
+      "name": "缄默德克萨斯",
+      "charId": "char_1028_texas2",
+      "tier": 4,
+      "order": 75,
+      "bonds": [
+        "siracusaShip",
+        "raidShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_17_a",
+      "name": "星熊",
+      "charId": "char_136_hsguma",
+      "tier": 4,
+      "order": 76,
+      "bonds": [
+        "yanShip"
+      ],
+      "bondNames": [
+        "炎"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_18_a",
+      "name": "泥岩",
+      "charId": "char_311_mudrok",
+      "tier": 4,
+      "order": 77,
+      "bonds": [
+        "soloShip"
+      ],
+      "bondNames": [
+        "独行"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_19_a",
+      "name": "焰尾",
+      "charId": "char_420_flamtl",
+      "tier": 4,
+      "order": 78,
+      "bonds": [
+        "kazimierzShip"
+      ],
+      "bondNames": [
+        "卡西米尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_20_a",
+      "name": "远牙",
+      "charId": "char_430_fartth",
+      "tier": 4,
+      "order": 79,
+      "bonds": [
+        "kazimierzShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_21_a",
+      "name": "白面鸮",
+      "charId": "char_128_plosis",
+      "tier": 4,
+      "order": 80,
+      "bonds": [
+        "deputShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "助力",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_22_a",
+      "name": "银灰",
+      "charId": "char_172_svrash",
+      "tier": 4,
+      "order": 81,
+      "bonds": [
+        "kjeragShip"
+      ],
+      "bondNames": [
+        "谢拉格"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_23_a",
+      "name": "百炼嘉维尔",
+      "charId": "char_1026_gvial2",
+      "tier": 4,
+      "order": 82,
+      "bonds": [
+        "sargonShip"
+      ],
+      "bondNames": [
+        "萨尔贡"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_24_a",
+      "name": "卡涅利安",
+      "charId": "char_426_billro",
+      "tier": 4,
+      "order": 83,
+      "bonds": [
+        "sargonShip",
+        "deputShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "助力"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_25_a",
+      "name": "魔王",
+      "charId": "char_4134_cetsyr",
+      "tier": 4,
+      "order": 84,
+      "bonds": [
+        "emptyShip"
+      ],
+      "bondNames": [
+        "协防干员"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_4_26_a",
+      "name": "华法琳",
+      "charId": "char_171_bldsk",
+      "tier": 4,
+      "order": 85,
+      "bonds": [
+        "miraShip"
+      ],
+      "bondNames": [
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_01_a",
+      "name": "圣约送葬人",
+      "charId": "char_1032_excu2",
+      "tier": 5,
+      "order": 86,
+      "bonds": [
+        "lateranoShip",
+        "visiShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "远见"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_02_a",
+      "name": "缇缇",
+      "charId": "char_4056_titi",
+      "tier": 5,
+      "order": 87,
+      "bonds": [
+        "sargonShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_03_a",
+      "name": "烛煌",
+      "charId": "char_1040_blaze2",
+      "tier": 5,
+      "order": 88,
+      "bonds": [
+        "victoriaShip",
+        "yanShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "炎"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_04_a",
+      "name": "华法琳",
+      "charId": "char_171_bldsk",
+      "tier": 5,
+      "order": 89,
+      "bonds": [
+        "miraShip"
+      ],
+      "bondNames": [
+        "奇迹"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_05_a",
+      "name": "乌尔比安",
+      "charId": "char_4145_ulpia",
+      "tier": 5,
+      "order": 90,
+      "bonds": [
+        "egirShip"
+      ],
+      "bondNames": [
+        "阿戈尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_06_a",
+      "name": "隐德来希",
+      "charId": "char_4010_etlchi",
+      "tier": 5,
+      "order": 91,
+      "bonds": [
+        "indomShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "不屈",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_07_a",
+      "name": "史尔特尔",
+      "charId": "char_350_surtr",
+      "tier": 5,
+      "order": 92,
+      "bonds": [
+        "raidShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "突袭",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_08_a",
+      "name": "号角",
+      "charId": "char_4039_horn",
+      "tier": 5,
+      "order": 93,
+      "bonds": [
+        "victoriaShip"
+      ],
+      "bondNames": [
+        "维多利亚"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_09_a",
+      "name": "魔王",
+      "charId": "char_4134_cetsyr",
+      "tier": 5,
+      "order": 94,
+      "bonds": [
+        "emptyShip"
+      ],
+      "bondNames": [
+        "协防干员"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_10_a",
+      "name": "铃兰",
+      "charId": "char_358_lisa",
+      "tier": 5,
+      "order": 95,
+      "bonds": [
+        "siracusaShip",
+        "emptyShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "协防干员"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_11_a",
+      "name": "塞雷娅",
+      "charId": "char_202_demkni",
+      "tier": 5,
+      "order": 96,
+      "bonds": [
+        "steadShip",
+        "soloShip"
+      ],
+      "bondNames": [
+        "坚守",
+        "独行"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_12_a",
+      "name": "夕",
+      "charId": "char_2015_dusk",
+      "tier": 5,
+      "order": 97,
+      "bonds": [
+        "yanShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "炎",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_13_a",
+      "name": "归溟幽灵鲨",
+      "charId": "char_1023_ghost2",
+      "tier": 5,
+      "order": 98,
+      "bonds": [
+        "egirShip",
+        "indomShip"
+      ],
+      "bondNames": [
+        "阿戈尔",
+        "不屈"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_14_a",
+      "name": "凛御银灰",
+      "charId": "char_1045_svash2",
+      "tier": 5,
+      "order": 99,
+      "bonds": [
+        "kjeragShip",
+        "investShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "投资人",
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_15_a",
+      "name": "引星棘刺",
+      "charId": "char_1039_thorn2",
+      "tier": 5,
+      "order": 100,
+      "bonds": [
+        "swiftShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "迅捷",
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_16_a",
+      "name": "白面鸮",
+      "charId": "char_128_plosis",
+      "tier": 5,
+      "order": 101,
+      "bonds": [
+        "deputShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "助力",
+        "灵巧"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_17_a",
+      "name": "山",
+      "charId": "char_264_f12yin",
+      "tier": 5,
+      "order": 102,
+      "bonds": [
+        "investShip"
+      ],
+      "bondNames": [
+        "投资人"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_18_a",
+      "name": "百炼嘉维尔",
+      "charId": "char_1026_gvial2",
+      "tier": 5,
+      "order": 103,
+      "bonds": [
+        "sargonShip"
+      ],
+      "bondNames": [
+        "萨尔贡"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_19_a",
+      "name": "玛恩纳",
+      "charId": "char_4064_mlynar",
+      "tier": 5,
+      "order": 104,
+      "bonds": [
+        "kazimierzShip"
+      ],
+      "bondNames": [
+        "卡西米尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_20_a",
+      "name": "安洁莉娜",
+      "charId": "char_291_aglina",
+      "tier": 5,
+      "order": 105,
+      "bonds": [
+        "siracusaShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "叙拉古",
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_21_a",
+      "name": "寒檀",
+      "charId": "char_341_sntlla",
+      "tier": 5,
+      "order": 106,
+      "bonds": [
+        "visiShip"
+      ],
+      "bondNames": [
+        "远见"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_22_a",
+      "name": "妮芙",
+      "charId": "char_4146_nymph",
+      "tier": 5,
+      "order": 107,
+      "bonds": [
+        "swiftShip"
+      ],
+      "bondNames": [
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_23_a",
+      "name": "录武官",
+      "charId": "char_4196_reckpr",
+      "tier": 5,
+      "order": 108,
+      "bonds": [
+        "yanShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "炎",
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_5_diy1_a",
+      "name": "甄选干员",
+      "charId": "None",
+      "tier": 5,
+      "order": 129,
+      "bonds": [],
+      "bondNames": [],
+      "buyable": false,
+      "hidden": false,
+      "diy": true
+    },
+    {
+      "id": "chess_char_5_diy2_a",
+      "name": "甄选干员",
+      "charId": "None",
+      "tier": 5,
+      "order": 130,
+      "bonds": [],
+      "bondNames": [],
+      "buyable": false,
+      "hidden": false,
+      "diy": true
+    },
+    {
+      "id": "chess_char_6_01_a",
+      "name": "蕾缪安",
+      "charId": "char_4193_lemuen",
+      "tier": 6,
+      "order": 109,
+      "bonds": [
+        "lateranoShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "拉特兰",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_02_a",
+      "name": "圣聆初雪",
+      "charId": "char_1046_sbell2",
+      "tier": 6,
+      "order": 110,
+      "bonds": [
+        "kjeragShip",
+        "arcaneShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "奥术"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_03_a",
+      "name": "余",
+      "charId": "char_2026_yu",
+      "tier": 6,
+      "order": 111,
+      "bonds": [
+        "yanShip",
+        "steadShip"
+      ],
+      "bondNames": [
+        "炎",
+        "坚守"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_04_a",
+      "name": "浊心斯卡蒂",
+      "charId": "char_1012_skadi2",
+      "tier": 6,
+      "order": 112,
+      "bonds": [
+        "egirShip"
+      ],
+      "bondNames": [
+        "阿戈尔"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_05_a",
+      "name": "异客",
+      "charId": "char_472_pasngr",
+      "tier": 6,
+      "order": 113,
+      "bonds": [
+        "sargonShip",
+        "swiftShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "迅捷",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_06_a",
+      "name": "佩佩",
+      "charId": "char_4058_pepe",
+      "tier": 6,
+      "order": 114,
+      "bonds": [
+        "sargonShip",
+        "indomShip"
+      ],
+      "bondNames": [
+        "萨尔贡",
+        "不屈"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_07_a",
+      "name": "维娜·维多利亚",
+      "charId": "char_1019_siege2",
+      "tier": 6,
+      "order": 115,
+      "bonds": [
+        "victoriaShip",
+        "miraShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "奇迹"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_08_a",
+      "name": "焰影苇草",
+      "charId": "char_1020_reed2",
+      "tier": 6,
+      "order": 116,
+      "bonds": [
+        "victoriaShip",
+        "preciShip"
+      ],
+      "bondNames": [
+        "维多利亚",
+        "精准"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_09_a",
+      "name": "塑心",
+      "charId": "char_245_cello",
+      "tier": 6,
+      "order": 117,
+      "bonds": [
+        "lateranoShip"
+      ],
+      "bondNames": [
+        "拉特兰"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_10_a",
+      "name": "妮芙",
+      "charId": "char_4146_nymph",
+      "tier": 6,
+      "order": 118,
+      "bonds": [
+        "swiftShip"
+      ],
+      "bondNames": [
+        "迅捷"
+      ],
+      "buyable": false,
+      "hidden": true,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_11_a",
+      "name": "缪尔赛思",
+      "charId": "char_249_mlyss",
+      "tier": 6,
+      "order": 119,
+      "bonds": [
+        "maniShip"
+      ],
+      "bondNames": [
+        "调和"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_12_a",
+      "name": "迷迭香",
+      "charId": "char_391_rosmon",
+      "tier": 6,
+      "order": 120,
+      "bonds": [
+        "preciShip",
+        "visiShip",
+        "emptyShip"
+      ],
+      "bondNames": [
+        "精准",
+        "远见",
+        "协防干员"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_13_a",
+      "name": "新约能天使",
+      "charId": "char_1041_angel2",
+      "tier": 6,
+      "order": 121,
+      "bonds": [
+        "lateranoShip"
+      ],
+      "bondNames": [
+        "拉特兰"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_14_a",
+      "name": "流明",
+      "charId": "char_4042_lumen",
+      "tier": 6,
+      "order": 122,
+      "bonds": [
+        "deputShip"
+      ],
+      "bondNames": [
+        "助力"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_15_a",
+      "name": "仇白",
+      "charId": "char_4082_qiubai",
+      "tier": 6,
+      "order": 123,
+      "bonds": [
+        "yanShip",
+        "raidShip"
+      ],
+      "bondNames": [
+        "炎",
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_16_a",
+      "name": "溯光星源",
+      "charId": "char_1047_halo2",
+      "tier": 6,
+      "order": 124,
+      "bonds": [
+        "arcaneShip",
+        "skillfulShip"
+      ],
+      "bondNames": [
+        "奥术",
+        "灵巧"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_17_a",
+      "name": "耀骑士临光",
+      "charId": "char_1014_nearl2",
+      "tier": 6,
+      "order": 125,
+      "bonds": [
+        "kazimierzShip",
+        "raidShip"
+      ],
+      "bondNames": [
+        "卡西米尔",
+        "突袭"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_18_a",
+      "name": "荒芜拉普兰德",
+      "charId": "char_1038_whitw2",
+      "tier": 6,
+      "order": 126,
+      "bonds": [
+        "siracusaShip"
+      ],
+      "bondNames": [
+        "叙拉古"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_19_a",
+      "name": "锏",
+      "charId": "char_4116_blkkgt",
+      "tier": 6,
+      "order": 127,
+      "bonds": [
+        "kjeragShip",
+        "kazimierzShip",
+        "swiftShip"
+      ],
+      "bondNames": [
+        "谢拉格",
+        "卡西米尔",
+        "迅捷"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_20_a",
+      "name": "纯烬艾雅法拉",
+      "charId": "char_1016_agoat2",
+      "tier": 6,
+      "order": 128,
+      "bonds": [
+        "deputShip"
+      ],
+      "bondNames": [
+        "助力"
+      ],
+      "buyable": true,
+      "hidden": false,
+      "diy": false
+    },
+    {
+      "id": "chess_char_6_diy1_a",
+      "name": "甄选干员",
+      "charId": "None",
+      "tier": 6,
+      "order": 131,
+      "bonds": [],
+      "bondNames": [],
+      "buyable": false,
+      "hidden": false,
+      "diy": true
+    },
+    {
+      "id": "chess_char_6_diy2_a",
+      "name": "甄选干员",
+      "charId": "None",
+      "tier": 6,
+      "order": 132,
+      "bonds": [],
+      "bondNames": [],
+      "buyable": false,
+      "hidden": false,
+      "diy": true
+    }
+  ],
+  "bonds": [
+    {
+      "id": "yanShip",
+      "name": "炎",
+      "isCore": true,
+      "order": 1
+    },
+    {
+      "id": "sargonShip",
+      "name": "萨尔贡",
+      "isCore": true,
+      "order": 2
+    },
+    {
+      "id": "victoriaShip",
+      "name": "维多利亚",
+      "isCore": true,
+      "order": 3
+    },
+    {
+      "id": "kjeragShip",
+      "name": "谢拉格",
+      "isCore": true,
+      "order": 4
+    },
+    {
+      "id": "lateranoShip",
+      "name": "拉特兰",
+      "isCore": true,
+      "order": 5
+    },
+    {
+      "id": "egirShip",
+      "name": "阿戈尔",
+      "isCore": true,
+      "order": 6
+    },
+    {
+      "id": "siracusaShip",
+      "name": "叙拉古",
+      "isCore": true,
+      "order": 7
+    },
+    {
+      "id": "kazimierzShip",
+      "name": "卡西米尔",
+      "isCore": true,
+      "order": 8
+    },
+    {
+      "id": "preciShip",
+      "name": "精准",
+      "isCore": false,
+      "order": 9
+    },
+    {
+      "id": "swiftShip",
+      "name": "迅捷",
+      "isCore": false,
+      "order": 10
+    },
+    {
+      "id": "skillfulShip",
+      "name": "灵巧",
+      "isCore": false,
+      "order": 11
+    },
+    {
+      "id": "arcaneShip",
+      "name": "奥术",
+      "isCore": false,
+      "order": 12
+    },
+    {
+      "id": "steadShip",
+      "name": "坚守",
+      "isCore": false,
+      "order": 13
+    },
+    {
+      "id": "deputShip",
+      "name": "助力",
+      "isCore": false,
+      "order": 14
+    },
+    {
+      "id": "visiShip",
+      "name": "远见",
+      "isCore": false,
+      "order": 15
+    },
+    {
+      "id": "miraShip",
+      "name": "奇迹",
+      "isCore": false,
+      "order": 16
+    },
+    {
+      "id": "investShip",
+      "name": "投资人",
+      "isCore": false,
+      "order": 17
+    },
+    {
+      "id": "raidShip",
+      "name": "突袭",
+      "isCore": false,
+      "order": 18
+    },
+    {
+      "id": "indomShip",
+      "name": "不屈",
+      "isCore": false,
+      "order": 19
+    },
+    {
+      "id": "maniShip",
+      "name": "调和",
+      "isCore": false,
+      "order": 20
+    },
+    {
+      "id": "emptyShip",
+      "name": "协防干员",
+      "isCore": false,
+      "order": 21
+    },
+    {
+      "id": "soloShip",
+      "name": "独行",
+      "isCore": false,
+      "order": 22
+    },
+    {
+      "id": "suntShip",
+      "name": "绝技",
+      "isCore": false,
+      "order": 23
+    }
+  ]
+}

@@ -1,0 +1,440 @@
+/* ==========================================================================
+   卫戍协议拿牌器 · 视觉 v3（2026-10-15）
+   Loaded after ui.css + workflow.css. Pure presentation layer: remove this file
+   (and its <link>/build line) to fall back to the previous look.
+   All selectors are anchored on `.workbench.workflow` so they win over the
+   older layers without !important.
+   ========================================================================== */
+.workbench.workflow{
+  --v-bg:#0b0f14; --v-surface:#10151c; --v-raised:#151b24; --v-raised-2:#1b2330; --v-sunken:#0c1117;
+  --v-line:rgba(148,163,184,.12); --v-line-2:rgba(148,163,184,.2); --v-line-3:rgba(148,163,184,.32);
+  --v-text:#e7edf4; --v-sub:#a3afbd; --v-faint:#6d7a8a;
+  --v-accent:#34d399; --v-accent-2:#22d3ee; --v-accent-ink:#04140d;
+  --v-keep:#f5b942; --v-keep-2:#fb923c; --v-keep-ink:#1a1003;
+  --v-danger:#f87171; --v-warn:#fbbf24;
+  --v-list:var(--v-accent); --v-list-2:var(--v-accent-2); --v-list-ink:var(--v-accent-ink);
+  --v-radius:12px; --v-radius-sm:8px;
+  --v-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.28);
+  --t1:#9aa8b8; --t2:#4ade80; --t3:#60a5fa; --t4:#c084fc; --t5:#fbbf24; --t6:#fb7185;
+  --v-font:"Inter","Segoe UI Variable","Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-family:var(--v-font);
+  font-variant-numeric:tabular-nums;
+  color:var(--v-text);
+  background:
+    radial-gradient(120% 60% at 0% 0%,rgba(52,211,153,.08),transparent 55%),
+    radial-gradient(90% 50% at 100% 100%,rgba(34,211,238,.05),transparent 60%),
+    var(--v-surface);
+  border-right:1px solid var(--v-line-2);
+  box-shadow:18px 0 60px rgba(0,0,0,.45);
+}
+.workbench.workflow[data-active=keep]{--v-list:var(--v-keep);--v-list-2:var(--v-keep-2);--v-list-ink:var(--v-keep-ink)}
+.workbench.workflow ::selection{background:rgba(52,211,153,.3)}
+.workbench.workflow *{scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.28) transparent}
+.workbench.workflow button:focus-visible,.workbench.workflow input:focus-visible,.workbench.workflow select:focus-visible{outline:2px solid var(--v-list);outline-offset:2px}
+.workbench.workflow input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.workbench.workflow input[type=number]::-webkit-inner-spin-button,.workbench.workflow input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+/* ---- Header ---------------------------------------------------------- */
+.workbench.workflow .top-accent{height:2px;background:linear-gradient(90deg,var(--v-accent),var(--v-accent-2) 45%,transparent)}
+.workbench.workflow .brand{height:60px;padding:10px 14px 10px 16px;gap:11px;border-bottom:0}
+.workbench.workflow .brand-avatar{width:34px;height:34px;border-radius:10px;border:0;box-shadow:0 0 0 1px var(--v-line-2),0 4px 14px rgba(52,211,153,.18)}
+.workbench.workflow .brand-text strong{font-size:16px;font-weight:700;letter-spacing:.02em;color:var(--v-text)}
+.workbench.workflow .brand-text small{font-size:10px;letter-spacing:.04em;margin-top:2px;color:var(--v-faint)}
+.workbench.workflow .header-controls{gap:2px}
+.workbench.workflow .icon-button{width:30px;height:30px;border-radius:8px;color:var(--v-sub);border:1px solid transparent}
+.workbench.workflow .icon-button svg{width:16px;height:16px}
+.workbench.workflow .icon-button:hover{background:var(--v-raised-2);border-color:var(--v-line-2);color:var(--v-text)}
+.workbench.workflow .context{min-height:30px;margin:0 14px;padding:0 10px;border:1px solid var(--v-line);border-radius:var(--v-radius-sm);background:var(--v-sunken);color:var(--v-sub);font-size:10px}
+.workbench.workflow .context-label svg{color:var(--v-faint)}
+.workbench.workflow .phase-pill{border:0;border-radius:999px;padding:3px 8px;background:rgba(52,211,153,.1);color:var(--v-accent);font-size:9px;letter-spacing:.02em}
+
+/* ---- Main column ----------------------------------------------------- */
+.workbench.workflow .main{padding:12px 14px 0;gap:10px}
+.workbench.workflow .tabs{position:relative;min-height:46px;padding:4px;gap:4px;border:1px solid var(--v-line);border-radius:var(--v-radius);background:var(--v-sunken)}
+.workbench.workflow .tab{min-height:36px;border-radius:9px;font-size:13px;font-weight:600;color:var(--v-sub);gap:7px;transition:color .15s,background .15s,box-shadow .15s}
+.workbench.workflow .tab:hover{color:var(--v-text);background:rgba(148,163,184,.06)}
+.workbench.workflow .tab svg{width:15px;height:15px}
+.workbench.workflow .tab[aria-selected=true]{color:var(--v-text);background:var(--v-raised-2);box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 0 0 1px var(--v-line-2),0 6px 16px rgba(0,0,0,.3)}
+.workbench.workflow .tab[aria-selected=true] svg{color:var(--v-list)}
+.workbench.workflow .tab-counter{min-width:22px;padding:2px 6px;border-radius:999px;font:600 10px/1.3 var(--v-font);background:rgba(148,163,184,.12);color:var(--v-sub)}
+.workbench.workflow .tab[aria-selected=true] .tab-counter{background:var(--v-list);color:var(--v-list-ink)}
+
+.workbench.workflow .plan-toolbar{gap:8px}
+.workbench.workflow .new-button{border:0;color:var(--v-list-ink);background:linear-gradient(135deg,var(--v-list),var(--v-list-2));box-shadow:0 6px 18px color-mix(in srgb,var(--v-list) 28%,transparent);font-weight:700;transition:filter .15s,transform .15s}
+.workbench.workflow .new-button:hover{filter:brightness(1.08);background:linear-gradient(135deg,var(--v-list),var(--v-list-2))}
+.workbench.workflow .new-button:active{transform:translateY(1px)}
+.workbench.workflow .new-button svg{width:15px;height:15px}
+.workbench.workflow .primary-add{min-height:40px;border-radius:10px;font-size:13px;gap:6px}
+.workbench.workflow .tool-button{min-height:40px;padding:0 12px;border:1px solid var(--v-line-2);border-radius:10px;background:var(--v-raised);color:var(--v-sub);font-size:12px;transition:background .15s,color .15s,border-color .15s}
+.workbench.workflow .tool-button:hover{background:var(--v-raised-2);color:var(--v-text);border-color:var(--v-line-3)}
+.workbench.workflow .tool-button[aria-expanded=true]{border-color:var(--v-list);color:var(--v-text);background:color-mix(in srgb,var(--v-list) 10%,var(--v-raised))}
+.workbench.workflow .plan-toolbar>[data-action=bulk-more]{width:40px;font-size:18px;letter-spacing:1px}
+.workbench.workflow .tool-button #filter-count{background:var(--v-list);color:var(--v-list-ink);border-radius:999px;min-width:16px;padding:1px 4px;font-size:9px}
+
+.workbench.workflow .search{min-height:40px;height:40px;border-radius:10px;border:1px solid var(--v-line);background:var(--v-sunken);color:var(--v-faint);padding:0 12px;transition:border-color .15s,box-shadow .15s}
+.workbench.workflow .search:focus-within{border-color:color-mix(in srgb,var(--v-list) 60%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--v-list) 14%,transparent)}
+.workbench.workflow .search input{color:var(--v-text);font-size:12px}
+.workbench.workflow .search input::placeholder{color:var(--v-faint)}
+.workbench.workflow .search kbd{border:1px solid var(--v-line-2);border-radius:5px;padding:1px 5px;font:10px var(--v-font);color:var(--v-faint);background:var(--v-raised)}
+.workbench.workflow .search-clear{color:var(--v-faint)}
+.workbench.workflow .search-clear:hover{color:var(--v-text)}
+.workbench.workflow .advanced-filter{padding:10px;gap:9px;border:1px solid var(--v-line);border-radius:var(--v-radius);background:var(--v-raised)}
+.workbench.workflow .bond-filter{height:34px;border:1px solid var(--v-line);border-radius:8px;background:var(--v-sunken);color:var(--v-faint)}
+.workbench.workflow .bond-filter select{color:var(--v-text);font-size:11px}
+.workbench.workflow .bond-filter option,.workbench.workflow .bond-filter optgroup{background:var(--v-raised-2);color:var(--v-text)}
+.workbench.workflow .selected-only{border:1px solid var(--v-line-2);border-radius:8px;background:var(--v-sunken);color:var(--v-sub)}
+.workbench.workflow .selected-only[aria-pressed=true]{border-color:var(--v-list);color:var(--v-text);background:color-mix(in srgb,var(--v-list) 14%,var(--v-sunken))}
+.workbench.workflow .tiers{gap:4px;padding:3px;border-radius:9px;background:var(--v-sunken);border:1px solid var(--v-line)}
+.workbench.workflow .tier-button{border:0;border-radius:6px;color:var(--v-sub);font-size:11px;padding:5px 0}
+.workbench.workflow .tier-button:hover{background:rgba(148,163,184,.08);color:var(--v-text)}
+.workbench.workflow .tier-button[aria-pressed=true]{background:var(--v-raised-2);color:var(--v-text);box-shadow:0 0 0 1px var(--v-line-2)}
+.workbench.workflow .tier-button[data-tier-filter="1"][aria-pressed=true],.workbench.workflow .tier-button[data-picker-tier="1"][aria-pressed=true]{color:var(--t1)}
+.workbench.workflow .tier-button[data-tier-filter="2"][aria-pressed=true],.workbench.workflow .tier-button[data-picker-tier="2"][aria-pressed=true]{color:var(--t2)}
+.workbench.workflow .tier-button[data-tier-filter="3"][aria-pressed=true],.workbench.workflow .tier-button[data-picker-tier="3"][aria-pressed=true]{color:var(--t3)}
+.workbench.workflow .tier-button[data-tier-filter="4"][aria-pressed=true],.workbench.workflow .tier-button[data-picker-tier="4"][aria-pressed=true]{color:var(--t4)}
+.workbench.workflow .tier-button[data-tier-filter="5"][aria-pressed=true],.workbench.workflow .tier-button[data-picker-tier="5"][aria-pressed=true]{color:var(--t5)}
+.workbench.workflow .tier-button[data-tier-filter="6"][aria-pressed=true],.workbench.workflow .tier-button[data-picker-tier="6"][aria-pressed=true]{color:var(--t6)}
+.workbench.workflow .text-button{color:var(--v-sub)}
+.workbench.workflow .text-button:hover{color:var(--v-list)}
+
+.workbench.workflow .list-heading{min-height:18px;padding:0 2px;font-size:11px;color:var(--v-sub)}
+.workbench.workflow .list-heading b{color:var(--v-text);font-weight:700}
+.workbench.workflow #enabled-summary{font-size:10px;color:var(--v-faint)}
+
+/* ---- Roster: rows become separate cards ------------------------------ */
+.workbench.workflow .operator-list{border:0;border-radius:0;background:transparent;padding:0 2px 8px;margin:0 -2px;display:block}
+.workbench.workflow #operator-rows{display:flex;flex-direction:column;gap:6px}
+.workbench.workflow .operator-row{--tier:var(--t1);min-height:54px;padding:0 6px 0 0;gap:4px;border:1px solid var(--v-line);border-radius:var(--v-radius);background:var(--v-raised);box-shadow:var(--v-shadow);transition:border-color .15s,background .15s,transform .15s}
+.workbench.workflow .operator-row[data-tier="2"]{--tier:var(--t2)}
+.workbench.workflow .operator-row[data-tier="3"]{--tier:var(--t3)}
+.workbench.workflow .operator-row[data-tier="4"]{--tier:var(--t4)}
+.workbench.workflow .operator-row[data-tier="5"]{--tier:var(--t5)}
+.workbench.workflow .operator-row[data-tier="6"]{--tier:var(--t6)}
+.workbench.workflow .operator-row:last-child{border-bottom:1px solid var(--v-line)}
+.workbench.workflow .operator-row:hover{border-color:var(--v-line-3);background:var(--v-raised-2)}
+.workbench.workflow .operator-row.is-selected{background:var(--v-raised)}
+.workbench.workflow .operator-row.is-selected:hover{background:var(--v-raised-2)}
+.workbench.workflow .operator-row.is-selected::before,.workbench.workflow .operator-row::before{content:"";position:absolute;left:-1px;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--tier);opacity:.9}
+.workbench.workflow .operator-row.is-locked::before{background:var(--tier)}
+.workbench.workflow .row-select{padding:8px 6px 8px 12px;gap:10px}
+.workbench.workflow .operator-avatar{width:34px;height:34px;border-radius:10px;font-size:15px;font-weight:700;color:var(--tier);border:1px solid color-mix(in srgb,var(--tier) 38%,transparent);background:linear-gradient(150deg,color-mix(in srgb,var(--tier) 22%,transparent),color-mix(in srgb,var(--tier) 6%,transparent))}
+.workbench.workflow .operator-name{gap:6px}
+.workbench.workflow .operator-name strong{font-size:13px;font-weight:650;color:var(--v-text)}
+.workbench.workflow .operator-bonds{font-size:10.5px;color:var(--v-faint);margin-top:1px}
+.workbench.workflow .rank{padding:1px 5px;border-radius:999px;font:700 9px/1.4 var(--v-font);letter-spacing:.02em;color:var(--tier);background:color-mix(in srgb,var(--tier) 14%,transparent)}
+.workbench.workflow .special-badge,.workbench.workflow .manual-badge{padding:1px 5px;border-radius:999px;border:0;font-size:9px;line-height:1.4}
+.workbench.workflow .special-badge{color:var(--v-warn);background:rgba(251,191,36,.12)}
+.workbench.workflow .manual-badge{color:#93c5fd;background:rgba(96,165,250,.14)}
+.workbench.workflow .entry-actions{gap:2px}
+/* 启用 / 已禁用 / 已满 as a status pill with a dot */
+.workbench.workflow .row-power{position:relative;min-width:56px;height:28px;min-height:28px;padding:0 9px 0 20px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid color-mix(in srgb,var(--v-accent) 40%,transparent);color:var(--v-accent);background:rgba(52,211,153,.1);transition:background .15s,border-color .15s,color .15s}
+.workbench.workflow .row-power::before{content:"";position:absolute;left:9px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.workbench.workflow .row-power:hover{background:rgba(52,211,153,.18)}
+.workbench.workflow .is-disabled .row-power,.workbench.workflow .row-power[aria-pressed=false]{color:var(--v-faint);border-color:var(--v-line-2);background:transparent}
+.workbench.workflow .is-disabled .row-power::before,.workbench.workflow .row-power[aria-pressed=false]::before{box-shadow:none}
+.workbench.workflow .is-disabled .row-power:hover,.workbench.workflow .row-power[aria-pressed=false]:hover{color:var(--v-text);border-color:var(--v-line-3)}
+.workbench.workflow .row-lock{width:28px;height:28px;border-radius:8px;color:var(--v-faint)}
+.workbench.workflow .row-lock:hover{background:var(--v-raised-2);color:var(--v-text)}
+.workbench.workflow .row-lock[aria-pressed=true]{color:var(--v-warn);background:rgba(251,191,36,.1)}
+.workbench.workflow .row-more{width:26px;height:28px;border-radius:8px;color:var(--v-faint);font-size:16px}
+.workbench.workflow .row-more:hover{background:var(--v-raised-2);color:var(--v-text);border-radius:8px}
+.workbench.workflow .operator-row.is-disabled{background:var(--v-surface);border-style:dashed;box-shadow:none}
+.workbench.workflow .operator-row.is-disabled::before{background:var(--v-faint);opacity:.5}
+.workbench.workflow .operator-row.is-disabled .operator-avatar{filter:grayscale(1);opacity:.5}
+.workbench.workflow .operator-row.is-disabled .operator-name strong{color:var(--v-faint);text-decoration:line-through;text-decoration-color:rgba(148,163,184,.5)}
+.workbench.workflow .operator-row.is-disabled .operator-bonds{color:var(--v-faint);opacity:.75}
+.workbench.workflow.compact .operator-row{min-height:44px}
+.workbench.workflow.compact .operator-avatar{width:28px;height:28px;font-size:13px;border-radius:8px}
+.workbench.workflow.compact .row-select{padding-top:5px;padding-bottom:5px}
+.workbench.workflow .empty{color:var(--v-faint);border:1px dashed var(--v-line-2);border-radius:var(--v-radius);background:rgba(148,163,184,.03);min-height:220px}
+.workbench.workflow .empty svg{color:var(--v-list);width:28px;height:28px}
+.workbench.workflow .empty strong{color:var(--v-text);font-weight:650}
+.workbench.workflow .empty .new-button{padding:8px 14px;border-radius:10px}
+
+/* Rule drawer attached under a row (保留干员 + 道具) */
+.workbench.workflow .operator-row:has(+ .keep-rules){border-radius:var(--v-radius) var(--v-radius) 0 0;border-bottom-color:transparent;box-shadow:none}
+.workbench.workflow .keep-rules{margin:-6px 0 0;padding:8px 10px 9px 12px;gap:6px 10px;border:1px solid var(--v-line);border-top:1px dashed var(--v-line);border-radius:0 0 var(--v-radius) var(--v-radius);background:var(--v-sunken);box-shadow:var(--v-shadow);font-size:11px}
+.workbench.workflow .operator-row.is-disabled + .keep-rules{border-style:dashed;box-shadow:none;opacity:.8}
+.workbench.workflow .item-limit-label,.workbench.workflow .item-funds-label{gap:5px;color:var(--v-sub);font-size:11px}
+.workbench.workflow .item-limit-label input,.workbench.workflow .item-funds-label input{height:26px;padding:0 6px;border:1px solid var(--v-line-2);border-radius:7px;background:var(--v-raised);color:var(--v-text);font:600 11px var(--v-font);text-align:center}
+.workbench.workflow .item-limit-label input{width:44px}
+.workbench.workflow .item-funds-label input{width:68px}
+.workbench.workflow .item-limit-label input:focus,.workbench.workflow .item-funds-label input:focus{border-color:var(--v-list);outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--v-list) 16%,transparent)}
+.workbench.workflow .item-limit-label input::placeholder,.workbench.workflow .item-funds-label input::placeholder{color:var(--v-faint);font-weight:400}
+.workbench.workflow .item-stepper{gap:0;height:26px;margin-left:0;border:1px solid var(--v-line-2);border-radius:999px;background:var(--v-raised);color:var(--v-text);font-size:11px;overflow:hidden}
+.workbench.workflow .item-stepper span{padding:0 8px;font-weight:600}
+.workbench.workflow .item-stepper button{width:26px;height:24px;border:0;border-radius:0;background:transparent;color:var(--v-sub);font-size:14px}
+.workbench.workflow .item-stepper button:hover:not(:disabled){background:var(--v-raised-2);color:var(--v-list)}
+.workbench.workflow .item-stepper button:disabled{opacity:.3}
+/* 自动使用: a real switch look built on the checkbox */
+.workbench.workflow .item-use-label{gap:7px;height:26px;padding:0 10px 0 6px;border:1px solid var(--v-line-2);border-radius:999px;background:var(--v-raised);color:var(--v-sub);font-size:11px;transition:border-color .15s,background .15s,color .15s}
+.workbench.workflow .item-use-label input{appearance:none;-webkit-appearance:none;position:relative;width:26px;height:15px;margin:0;border-radius:999px;background:rgba(148,163,184,.25);cursor:pointer;transition:background .15s}
+.workbench.workflow .item-use-label input::after{content:"";position:absolute;left:2px;top:2px;width:11px;height:11px;border-radius:50%;background:#d6dde6;transition:transform .15s}
+.workbench.workflow .item-use-label input:checked{background:var(--v-accent)}
+.workbench.workflow .item-use-label input:checked::after{transform:translateX(11px);background:var(--v-accent-ink)}
+.workbench.workflow .item-use-label.is-on{color:var(--v-text);border-color:color-mix(in srgb,var(--v-accent) 45%,transparent);background:rgba(52,211,153,.08)}
+.workbench.workflow .item-use-note{display:flex;gap:6px;align-items:flex-start;padding:6px 8px;border-radius:8px;background:rgba(251,191,36,.08);color:#fcd34d;font-size:10.5px;line-height:1.45}
+
+/* ---- 道具规则 section -------------------------------------------------- */
+.workbench.workflow .item-section{margin:0 0 10px;border:1px solid var(--v-line);border-radius:var(--v-radius);background:linear-gradient(180deg,rgba(245,185,66,.06),transparent 120px),var(--v-raised);box-shadow:var(--v-shadow);overflow:hidden}
+.workbench.workflow .item-section>summary{min-height:42px;padding:10px 12px;gap:8px;color:var(--v-text);font-size:12px}
+.workbench.workflow .item-section>summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--v-sub);border-bottom:2px solid var(--v-sub);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.workbench.workflow .item-section:not([open])>summary::before{content:"";transform:rotate(-45deg)}
+.workbench.workflow .item-section>summary strong{font-size:13px;font-weight:650}
+.workbench.workflow .item-section>summary span{padding:1px 7px;border-radius:999px;background:rgba(245,185,66,.14);color:var(--v-keep);font:600 10px/1.5 var(--v-font)}
+.workbench.workflow .item-section>summary small{color:var(--v-faint);font-size:10px}
+.workbench.workflow .item-content{gap:8px;padding:0 10px 12px}
+.workbench.workflow .item-help{border:1px solid var(--v-line);border-radius:9px;background:var(--v-sunken)}
+.workbench.workflow .item-help>summary{display:flex;align-items:center;gap:6px;padding:7px 10px;color:var(--v-sub);font-size:11px;cursor:pointer;list-style:none}
+.workbench.workflow .item-help>summary::-webkit-details-marker{display:none}
+.workbench.workflow .item-help>summary::before{content:"i";display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:rgba(148,163,184,.16);color:var(--v-text);font:700 10px/1 Georgia,serif}
+.workbench.workflow .item-help>summary::after{content:"展开";margin-left:auto;color:var(--v-faint);font-size:10px}
+.workbench.workflow .item-help[open]>summary::after{content:"收起"}
+.workbench.workflow .item-help>p{margin:0;padding:0 10px 9px;color:var(--v-sub);font-size:10.5px;line-height:1.6}
+.workbench.workflow .item-add-row{gap:6px}
+.workbench.workflow .item-add-row select,.workbench.workflow .item-add-row input{height:34px;padding:0 10px;border:1px solid var(--v-line-2);border-radius:9px;background:var(--v-sunken);color:var(--v-text);font-size:12px}
+.workbench.workflow .item-add-row select:focus,.workbench.workflow .item-add-row input:focus{border-color:var(--v-keep);outline:0}
+.workbench.workflow .item-add-row option{background:var(--v-raised-2);color:var(--v-text)}
+.workbench.workflow .item-add-row button,.workbench.workflow .item-next{height:34px;padding:0 12px;border:1px solid var(--v-line-2);border-radius:9px;background:var(--v-raised-2);color:var(--v-text);font-size:11px;font-weight:600}
+.workbench.workflow .item-add-row button:hover,.workbench.workflow .item-next:hover:not(:disabled){border-color:var(--v-keep);color:var(--v-keep);background:rgba(245,185,66,.08)}
+.workbench.workflow .item-list{gap:8px;margin-top:2px}
+.workbench.workflow .item-list .operator-row{box-shadow:none;background:var(--v-raised-2)}
+.workbench.workflow .item-list .keep-rules{box-shadow:none;background:var(--v-surface)}
+.workbench.workflow .item-row .operator-avatar{border-radius:9px}
+.workbench.workflow .item-remove{width:26px;color:var(--v-faint);font-size:16px}
+.workbench.workflow .item-remove:hover{color:var(--v-danger);background:rgba(248,113,113,.12)}
+.workbench.workflow .item-next{align-self:stretch;margin-top:4px;border-style:dashed;color:var(--v-sub);background:transparent}
+.workbench.workflow .item-content>.item-error{margin:0;color:var(--v-danger);font-size:11px}
+.workbench.workflow .item-content>.item-list>.item-empty{padding:12px;text-align:center;border:1px dashed var(--v-line-2);border-radius:9px;color:var(--v-faint)}
+.workbench.workflow .mapping-note{border:1px solid rgba(251,191,36,.3);border-radius:9px;background:rgba(251,191,36,.08);color:#fcd34d;padding:6px 10px}
+.workbench.workflow .list-note{margin:0 0 8px;color:var(--v-faint);font-size:10px}
+.workbench.workflow .list-note svg{color:var(--v-faint)}
+
+/* ---- Footer / execution dock ---------------------------------------- */
+.workbench.workflow .footer{padding:10px 14px 9px;border-top:1px solid var(--v-line);background:linear-gradient(180deg,rgba(11,15,20,.4),var(--v-bg));backdrop-filter:blur(8px)}
+.workbench.workflow .auto-card{padding:10px 10px 10px 12px;border:1px solid var(--v-line-2);border-radius:var(--v-radius);background:linear-gradient(135deg,rgba(52,211,153,.07),rgba(34,211,238,.03) 60%,transparent),var(--v-raised);box-shadow:var(--v-shadow)}
+.workbench.workflow .auto-title{gap:7px}
+.workbench.workflow .auto-title>svg{width:15px;height:15px;color:var(--v-accent)}
+.workbench.workflow .auto-title strong{font-size:13px;font-weight:700}
+.workbench.workflow .runtime-brief{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:rgba(148,163,184,.1);color:var(--v-sub);font-size:10px}
+.workbench.workflow .runtime-brief::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--v-faint);flex:none}
+.workbench.workflow .auto-card #draft-note{margin-top:6px;color:var(--v-sub);font-size:10.5px}
+.workbench.workflow .auto-risk{color:var(--v-faint)!important;font-size:9.5px!important}
+.workbench.workflow .run-button{min-width:76px;min-height:34px;padding:0 16px;border:0;border-radius:10px;font-size:13px;font-weight:700;color:var(--v-accent-ink);background:linear-gradient(135deg,var(--v-accent),var(--v-accent-2));box-shadow:0 6px 18px rgba(52,211,153,.28);transition:filter .15s,transform .15s}
+.workbench.workflow .run-button:hover{filter:brightness(1.08)}
+.workbench.workflow .run-button:active{transform:translateY(1px)}
+.workbench.workflow .run-button[aria-checked=true]{color:#fff;background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 6px 18px rgba(239,68,68,.3)}
+.workbench.workflow .run-button:disabled{filter:grayscale(.6);opacity:.45;box-shadow:none}
+.workbench.workflow:has(.run-button[aria-checked=true]) .runtime-brief{background:rgba(52,211,153,.14);color:var(--v-accent)}
+.workbench.workflow:has(.run-button[aria-checked=true]) .runtime-brief::before{background:var(--v-accent);box-shadow:0 0 0 3px rgba(52,211,153,.2);animation:v-pulse 1.4s ease-in-out infinite}
+@keyframes v-pulse{50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
+.workbench.workflow .utility-bar{gap:8px;margin-top:8px}
+.workbench.workflow .utility-button{min-height:32px;padding:0 10px;border:1px solid var(--v-line);border-radius:9px;background:var(--v-raised);color:var(--v-text);font-size:11px;transition:border-color .15s,background .15s}
+.workbench.workflow .utility-button:hover{border-color:var(--v-line-3);background:var(--v-raised-2)}
+.workbench.workflow .utility-button span{padding:1px 6px;border-radius:999px;background:rgba(148,163,184,.1);color:var(--v-sub);font-size:9.5px}
+.workbench.workflow .save-status{margin-top:7px;color:var(--v-faint);font-size:9.5px}
+.workbench.workflow .save-dot{width:6px;height:6px;background:var(--v-accent);box-shadow:0 0 6px var(--v-accent)}
+.workbench.workflow .save-status[data-state=error] .save-dot{background:var(--v-danger);box-shadow:0 0 6px var(--v-danger)}
+.workbench.workflow .save-status .version{color:var(--v-faint);font-size:9px;padding:1px 6px;border:1px solid var(--v-line);border-radius:999px}
+
+/* ---- Menus, toast ---------------------------------------------------- */
+.workbench.workflow .action-menu{padding:12px;border:1px solid var(--v-line-2);border-radius:var(--v-radius);background:rgba(21,27,36,.96);backdrop-filter:blur(12px);box-shadow:0 18px 40px rgba(0,0,0,.5);color:var(--v-text)}
+.workbench.workflow .action-menu p{color:var(--v-sub)}
+.workbench.workflow .action-menu>span{color:var(--v-faint)}
+.workbench.workflow .action-menu button{border:1px solid rgba(248,113,113,.35);border-radius:9px;background:rgba(248,113,113,.1);color:#fca5a5;font-weight:600}
+.workbench.workflow .action-menu button:hover:not(:disabled){background:rgba(248,113,113,.18)}
+/* Feedback is a normal-flow status row; its reserved size does not change on click. */
+.workbench.workflow .feedback-slot{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:32px;block-size:32px;min-inline-size:0;flex:1;overflow:hidden}
+.workbench.workflow .feedback-slot>*{grid-area:1/1;align-self:center;min-inline-size:0;max-inline-size:100%;margin:0}
+.workbench.workflow .feedback-slot>[data-feedback-default]{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.workbench.workflow .feedback-slot.has-feedback>[data-feedback-default]{visibility:hidden}
+.workbench.workflow .feedback-slot>.toast{position:static;inset:auto;z-index:auto;width:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent;backdrop-filter:none;box-shadow:none;transform:none;animation:none;color:var(--v-list);font-size:11px;line-height:16px;max-height:32px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;overflow:hidden;overflow-wrap:anywhere;pointer-events:none}
+.workbench.workflow .feedback-slot>.toast[hidden]{display:none}
+.workbench.workflow .feedback-slot[data-feedback-slot="main"],.workbench.workflow .feedback-slot[data-feedback-slot="settings"]{grid-template-rows:18px;block-size:18px;min-block-size:18px;flex:none}
+.workbench.workflow .feedback-slot[data-feedback-slot="main"]>.toast,.workbench.workflow .feedback-slot[data-feedback-slot="settings"]>.toast{display:block;line-height:18px;max-height:18px;white-space:nowrap;text-overflow:ellipsis}
+.workbench.workflow .feedback-slot[data-feedback-slot="main"]>.toast[hidden],.workbench.workflow .feedback-slot[data-feedback-slot="settings"]>.toast[hidden]{display:none}
+.workbench.workflow .settings>.feedback-slot{margin-top:8px}
+.workbench.workflow .settings>.settings-head,.workbench.workflow .settings>.settings-done{flex:none}
+@keyframes v-rise{from{opacity:0;transform:translateY(6px)}}
+
+/* ---- Dialogs: picker, settings, utility sheet ------------------------ */
+.workbench.workflow .picker-backdrop,.workbench.workflow .settings-backdrop{background:rgba(5,8,12,.68);backdrop-filter:blur(6px)}
+.workbench.workflow .picker,.workbench.workflow .settings{border:1px solid var(--v-line-2);border-radius:16px;background:var(--v-surface);box-shadow:0 24px 60px rgba(0,0,0,.55);color:var(--v-text)}
+.workbench.workflow .picker-head{border-bottom:1px solid var(--v-line)}
+.workbench.workflow .picker-head h2,.workbench.workflow .settings-head h2{font-size:16px;font-weight:700}
+.workbench.workflow .picker-head p{color:var(--v-faint)}
+.workbench.workflow .manual-entry{margin:12px 14px 0;padding:10px;border:1px solid var(--v-line);border-radius:var(--v-radius);background:var(--v-raised)}
+.workbench.workflow .manual-entry>label{color:var(--v-sub)}
+.workbench.workflow .manual-input-row input{height:36px;border:1px solid var(--v-line-2);border-radius:9px;background:var(--v-sunken);color:var(--v-text)}
+.workbench.workflow .manual-input-row input:focus-visible{border-color:var(--v-list);outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--v-list) 15%,transparent)}
+.workbench.workflow .manual-input-row .new-button{height:36px;border-radius:9px}
+.workbench.workflow .manual-entry p{color:var(--v-faint)}
+.workbench.workflow .picker-filters{padding:12px 14px 0}
+.workbench.workflow .picker-meta{padding:0 16px;color:var(--v-faint);font-size:10.5px}
+.workbench.workflow .picker-meta b{color:var(--v-text)}
+.workbench.workflow .picker-list{margin:0 14px;border:1px solid var(--v-line);border-radius:var(--v-radius);background:var(--v-sunken)}
+.workbench.workflow .picker-row{--tier:var(--t1);border-bottom:1px solid var(--v-line)}
+.workbench.workflow .picker-row[data-tier="2"]{--tier:var(--t2)}
+.workbench.workflow .picker-row[data-tier="3"]{--tier:var(--t3)}
+.workbench.workflow .picker-row[data-tier="4"]{--tier:var(--t4)}
+.workbench.workflow .picker-row[data-tier="5"]{--tier:var(--t5)}
+.workbench.workflow .picker-row[data-tier="6"]{--tier:var(--t6)}
+.workbench.workflow .picker-row .operator-avatar{color:var(--tier);border:1px solid color-mix(in srgb,var(--tier) 38%,transparent);background:linear-gradient(150deg,color-mix(in srgb,var(--tier) 22%,transparent),color-mix(in srgb,var(--tier) 6%,transparent))}
+.workbench.workflow .picker-add{background:transparent;color:var(--v-text)}
+.workbench.workflow .picker-add:not(:disabled):hover{background:var(--v-raised)}
+.workbench.workflow .picker-add-label{padding:3px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--v-list) 45%,transparent);color:var(--v-list);font-size:10.5px;font-weight:600}
+.workbench.workflow .picker-add:not(:disabled):hover .picker-add-label{background:var(--v-list);color:var(--v-list-ink)}
+.workbench.workflow .picker-add:disabled{background:transparent}
+.workbench.workflow .picker-add:disabled .picker-add-label{border-color:transparent;color:var(--v-faint)}
+.workbench.workflow .picker-footer{border-top:1px solid var(--v-line);margin-top:12px}
+.workbench.workflow .picker-footer p{color:var(--v-faint)}
+.workbench.workflow .settings-done{border:0;border-radius:10px;color:var(--v-list-ink);background:linear-gradient(135deg,var(--v-list),var(--v-list-2));font-weight:700}
+.workbench.workflow .settings-done:hover{filter:brightness(1.08)}
+.workbench.workflow .settings-group>label{color:var(--v-sub)}
+.workbench.workflow .settings-group p{color:var(--v-faint)}
+.workbench.workflow .width-options{gap:4px;padding:3px;border:1px solid var(--v-line);border-radius:10px;background:var(--v-sunken)}
+.workbench.workflow .width-options button{border:0;border-radius:7px;background:transparent;color:var(--v-sub);font:600 11px var(--v-font)}
+.workbench.workflow .width-options button[aria-pressed=true]{background:var(--v-raised-2);color:var(--v-text);box-shadow:0 0 0 1px var(--v-line-2)}
+.workbench.workflow .switch{border:0;background:rgba(148,163,184,.25)}
+.workbench.workflow .switch span{background:#d6dde6}
+.workbench.workflow .switch[aria-checked=true]{background:var(--v-accent);border:0}
+.workbench.workflow .switch[aria-checked=true] span{background:var(--v-accent-ink)}
+.workbench.workflow .settings-note{border:1px solid rgba(251,191,36,.25);border-radius:10px;background:rgba(251,191,36,.06);color:#e9d8a6}
+.workbench.workflow .utility-backdrop{background:var(--v-bg)}
+.workbench.workflow .utility-sheet{background:radial-gradient(120% 50% at 0 0,rgba(52,211,153,.06),transparent 60%),var(--v-surface);color:var(--v-text)}
+.workbench.workflow .utility-head{border-bottom:1px solid var(--v-line)}
+.workbench.workflow .utility-head h2{font-weight:700}
+.workbench.workflow .utility-head .tool-button{min-height:32px}
+.workbench.workflow .sheet-hint{color:var(--v-faint)}
+.workbench.workflow .log-list,.workbench.workflow .health-list{border:1px solid var(--v-line);border-radius:var(--v-radius);background:var(--v-sunken);color:var(--v-sub)}
+.workbench.workflow .log-entry{border-bottom:1px solid var(--v-line)}
+.workbench.workflow .log-entry time{color:var(--v-faint)}
+.workbench.workflow .utility-foot{border-top:1px solid var(--v-line);color:var(--v-faint)}
+
+@media(max-width:380px){
+  .workbench.workflow .row-power{min-width:50px;padding:0 7px 0 17px}
+  .workbench.workflow .row-power::before{left:7px}
+  .workbench.workflow .row-select{padding-left:10px;gap:8px}
+}
+@media(prefers-reduced-motion:reduce){.workbench.workflow *{animation:none!important;transition:none!important}}
+
+/* ---- small fixes + offline preview page ------------------------------ */
+.workbench.workflow .search input:focus-visible{outline:0}
+.workbench.workflow .picker-meta{margin-top:4px;margin-bottom:6px}
+.preview .launcher{border:1px solid #2a3442;border-left:0;border-radius:0 12px 12px 0;background:linear-gradient(180deg,#1b2330,#10151c);color:#e7edf4;box-shadow:6px 8px 24px #0007}
+.preview .preview-stage{background:radial-gradient(ellipse at 80% 50%,#13202a 0%,#0d1218 50%,#0a0d12 100%)}
+.preview .preview-stage:before{background-image:linear-gradient(rgba(148,163,184,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.05) 1px,transparent 1px)}
+.preview .preview-bar{background:rgba(13,18,24,.7);border-bottom-color:rgba(148,163,184,.12)}
+.preview .preview-bar strong,.preview .preview-content h1{color:#e7edf4}
+.preview .preview-content h1 span{background:linear-gradient(90deg,#34d399,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+.preview .preview-label,.preview .preview-details small{color:#34d399}
+.preview .preview-label:before{background:#34d399}
+.preview .preview-content>p,.preview .preview-foot,.preview .preview-bar>span{color:#8b98a8;border-color:rgba(148,163,184,.2)}
+.preview .preview-details{border-top-color:rgba(148,163,184,.15)}
+.preview .preview-details strong{color:#cfd8e3}
+.preview .preview-foot{border-top-color:rgba(148,163,184,.12)}
+.preview .preview-watermark{color:#9fb3c8;opacity:.035}
+
+/* ---- 启停快捷键 ------------------------------------------------------ */
+.workbench.workflow .hotkey-text label{color:var(--v-text);font-size:12px}
+.workbench.workflow .hotkey-text p{color:var(--v-faint)}
+.workbench.workflow .hotkey-button{border:1px solid var(--v-line-2);border-radius:10px;background:var(--v-sunken);color:var(--v-faint);transition:border-color .15s,box-shadow .15s}
+.workbench.workflow .hotkey-button:hover{border-color:var(--v-line-3);color:var(--v-sub)}
+.workbench.workflow .hotkey-button kbd{border:1px solid var(--v-line-3);border-bottom-width:2px;border-radius:7px;background:var(--v-raised-2);color:var(--v-text);font:700 11px/1.3 var(--v-font)}
+.workbench.workflow .hotkey-button[aria-pressed=true]{border-color:var(--v-accent);color:var(--v-accent);box-shadow:0 0 0 3px rgba(52,211,153,.15)}
+.workbench.workflow .hotkey-button[aria-pressed=true] kbd{border-color:var(--v-accent);color:var(--v-accent)}
+.workbench.workflow .hotkey-error{border:1px solid rgba(248,113,113,.35);border-radius:9px;background:rgba(248,113,113,.08);color:#fca5a5}
+.workbench.workflow .hotkey-chip{padding:1px 6px;border:1px solid var(--v-line-3);border-bottom-width:2px;border-radius:6px;background:var(--v-raised-2);color:var(--v-sub);font:700 9.5px/1.3 var(--v-font)}
+.workbench.workflow:has(.run-button[aria-checked=true]) .hotkey-chip{color:var(--v-text);border-color:rgba(248,113,113,.5)}
+
+/* ---- 「道具」标签页 + 全高选择弹窗（显示更多候选） -------------------- */
+.workbench.workflow{--v-item:#a78bfa;--v-item-2:#c4b5fd;--v-item-ink:#1a1033}
+.workbench.workflow[data-active=items]{--v-list:var(--v-item);--v-list-2:var(--v-item-2);--v-list-ink:var(--v-item-ink)}
+.workbench.workflow .tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+.workbench.workflow .tab{white-space:nowrap;min-width:0;padding-left:6px;padding-right:6px}
+@media(max-width:400px){.workbench.workflow .tab-suffix{display:none}}
+.workbench.workflow .item-panel{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;margin:0;padding:0;border:0;background:none}
+.workbench.workflow .item-panel[hidden]{display:none}
+.workbench.workflow .item-panel>.list-heading{margin:0}
+.workbench.workflow .item-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;padding-right:2px}
+.workbench.workflow .item-scroll>.item-list{flex:none}
+.workbench.workflow .item-scroll .empty{min-height:200px}
+.workbench.workflow .item-scroll .item-next{align-self:flex-start}
+.workbench.workflow .item-scroll .item-empty{padding:18px 8px;text-align:center;color:var(--v-faint);font-size:12px}
+.workbench.workflow .price-badge{padding:1px 6px;border-radius:999px;background:rgba(251,191,36,.12);color:#fcd34d;font:600 10px/1.5 var(--v-font);white-space:nowrap}
+.workbench.workflow .picker .operator-name{display:flex;align-items:center;gap:5px;min-width:0}
+.workbench.workflow .picker .operator-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workbench.workflow .picker .operator-bonds{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 弹窗占满侧栏高度：列表区随之变长；手动输入折叠到底部 */
+.workbench.workflow .picker-backdrop{padding:10px 8px;place-items:stretch}
+.workbench.workflow .picker{height:100%;max-height:none}
+.workbench.workflow .picker-head{padding:12px 14px 10px;align-items:center}
+.workbench.workflow .picker-head h2{margin:0 0 3px}
+.workbench.workflow .picker-head p{font-size:10.5px;line-height:1.45}
+.workbench.workflow .picker-filters{padding:10px 12px 0;gap:6px}
+.workbench.workflow .picker-filters .search input{height:34px}
+.workbench.workflow .picker-meta{padding:6px 14px}
+.workbench.workflow .picker-list{flex:1;min-height:120px;margin:0 10px}
+.workbench.workflow .picker-add{min-height:46px;padding:6px 10px;gap:9px}
+.workbench.workflow .picker-add .operator-avatar{width:30px;height:30px;flex:none;font-size:13px}
+.workbench.workflow .picker-row.is-added .operator-text{opacity:.6}
+.workbench.workflow .manual-details{flex:none;margin:8px 10px 0;border:1px solid var(--v-line);border-radius:10px;background:var(--v-sunken)}
+.workbench.workflow .manual-details>summary{display:flex;align-items:center;gap:7px;padding:8px 11px;color:var(--v-sub);font-size:11.5px;cursor:pointer;list-style:none}
+.workbench.workflow .manual-details>summary::-webkit-details-marker{display:none}
+.workbench.workflow .manual-details>summary::before{content:"+";display:grid;place-items:center;width:16px;height:16px;border-radius:50%;background:rgba(148,163,184,.14);color:var(--v-list);font-weight:700}
+.workbench.workflow .manual-details[open]>summary::before{content:"−"}
+.workbench.workflow .manual-details>summary:hover{color:var(--v-text)}
+.workbench.workflow .manual-details .manual-entry{margin:0;border:0;border-top:1px solid var(--v-line);border-radius:0 0 10px 10px;background:transparent;padding:9px 10px}
+.workbench.workflow .manual-details .manual-entry>label{display:none}
+.workbench.workflow .picker-footer{display:flex;align-items:center;gap:10px;padding:8px 12px 10px}
+.workbench.workflow .picker-footer p{flex:1;min-height:0;margin:0;font-size:10.5px;line-height:1.45}
+.workbench.workflow .picker-footer .settings-done{flex:none;margin:0;padding:8px 18px;width:auto}
+.workbench.workflow .tier-button[data-item-tier="1"][aria-pressed=true]{color:var(--t1)}
+.workbench.workflow .tier-button[data-item-tier="2"][aria-pressed=true]{color:var(--t2)}
+.workbench.workflow .tier-button[data-item-tier="3"][aria-pressed=true]{color:var(--t3)}
+.workbench.workflow .tier-button[data-item-tier="4"][aria-pressed=true]{color:var(--t4)}
+.workbench.workflow .tier-button[data-item-tier="5"][aria-pressed=true]{color:var(--t5)}
+.workbench.workflow .tier-button[data-item-tier="6"][aria-pressed=true]{color:var(--t6)}
+/* 名单页：行更紧凑，同屏多显示几条 */
+.workbench.workflow .row-select{min-height:50px;padding-top:6px;padding-bottom:6px}
+.workbench.workflow .list-heading{display:flex;align-items:center;gap:8px}
+.workbench.workflow .list-heading>span:first-child{margin-right:auto}
+.workbench.workflow .density-toggle{flex:none;height:20px;padding:0 8px;border:1px solid var(--v-line-2);border-radius:999px;background:transparent;color:var(--v-sub);font-size:10.5px;cursor:pointer}
+.workbench.workflow .density-toggle:hover{color:var(--v-text);border-color:var(--v-list)}
+.workbench.workflow .density-toggle[aria-pressed=true]{background:color-mix(in srgb,var(--v-list) 18%,transparent);border-color:color-mix(in srgb,var(--v-list) 55%,transparent);color:var(--v-list-2)}
+/* 紧凑：说明文字并到名字同一行，行高约 38px */
+.workbench.workflow.compact .operator-row{min-height:38px}
+.workbench.workflow.compact .row-select{min-height:38px;padding-top:4px;padding-bottom:4px}
+.workbench.workflow.compact .operator-text{display:flex;align-items:center;gap:8px;min-width:0}
+.workbench.workflow.compact .operator-name{flex:none;max-width:62%;min-width:0}
+.workbench.workflow.compact .operator-bonds{flex:1;min-width:0;margin-top:0}
+.workbench.workflow.compact .operator-avatar{width:26px;height:26px;font-size:12px}
+.workbench.workflow.compact .keep-rules{gap:4px 6px;padding-top:5px;padding-bottom:6px}
+.workbench.workflow.compact .item-list{gap:5px}
+.workbench.workflow.compact .picker-add{min-height:40px;padding-top:4px;padding-bottom:4px}
+/* 矮屏：收起次要提示，把高度让给名单 */
+@media(max-height:720px){
+  .workbench.workflow .auto-card .auto-risk,.workbench.workflow .main .list-note{display:none!important}
+  .workbench.workflow .brand{height:50px;padding-top:6px;padding-bottom:6px}
+  .workbench.workflow .brand-avatar{width:32px;height:32px}
+  .workbench.workflow .main{gap:6px;padding-top:6px}
+  .workbench.workflow .tabs{min-height:40px;padding:3px}
+  .workbench.workflow .tab{min-height:32px}
+  .workbench.workflow .primary-add,.workbench.workflow .plan-toolbar>.tool-button,.workbench.workflow .plan-toolbar>.icon-button{min-height:36px;height:36px}
+  .workbench.workflow .search{min-height:34px;height:34px}
+  .workbench.workflow .footer{padding-top:6px;gap:6px}
+  .workbench.workflow .auto-card{padding-top:8px;padding-bottom:8px}
+  .workbench.workflow .utility-button{min-height:30px;height:30px}
+}
+/* 配置文件导入 / 导出 */
+.workbench.workflow .config-group{display:flex;flex-direction:column;gap:8px}
+.workbench.workflow .config-text label{display:block;margin-bottom:3px}
+.workbench.workflow .config-text p,.workbench.workflow .config-hint{margin:0;font-size:10.5px;line-height:1.5}
+.workbench.workflow .config-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.workbench.workflow .config-actions .tool-button{display:flex;align-items:center;justify-content:center;gap:6px;height:34px;width:100%}
+.workbench.workflow .config-actions .tool-button svg{width:14px;height:14px}
+.workbench.workflow .config-restore{align-self:flex-start;padding:0;color:var(--v-list);font-size:11px}
+/* Keep settings feedback and its close button outside the scrolling content. */
+.workbench.workflow .settings{display:flex;flex-direction:column;max-height:calc(100vh - 32px);overflow:hidden}
+.workbench.workflow .settings-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1}
+.workbench.workflow .settings-backdrop{padding:16px}

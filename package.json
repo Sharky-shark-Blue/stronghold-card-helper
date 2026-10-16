@@ -1,0 +1,15 @@
+{
+  "name": "wei-cardkeeper-ui",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node build.mjs && node --test test/*.test.mjs && node test/verify-auto-policy.mjs && node test/verify-auto-controller.mjs && node test/verify-transport.mjs && node test/verify-lock.mjs && node test/verify-audit-log.mjs && node test/verify-bridge.mjs",
+    "check:runtime": "node test/runtime-browser-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
