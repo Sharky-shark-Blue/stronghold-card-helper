@@ -1,5 +1,6 @@
 import { sameUnitWithPlacement, compatiblePlacementArea } from './placement.js';
 import { isPackagingMergeOffer } from './packaging.js';
+import { auditSwireCoinGift } from './coin-audit.js';
 
 // Shared pure trade evidence. Both the isolated controller and MAIN compile this module.
 // A retained merge is attributable only when one new normal completes these exact old copies.
@@ -48,27 +49,18 @@ export function auditOrdinaryPurchase(before, after, candidate, {chess={}, retai
   const gained=after.items.filter(item=>!before.itemByUid.has(item.uid));
   const lost=before.items.filter(item=>!after.itemByUid.has(item.uid));
   const bench=item=>!!item && ['hand','temp'].includes(item.area) && item.carrierUid==null;
-  let coin=null, consumedCoin=null;
-  // The one explicit item-gift exception: normal Swire's coin, or its exact bench merge.
-  // Unexpected multi-gifts, equipped-coin merges and elite side effects remain blocked.
-  if(candidate.id==='chess_char_3_03_a' && !merged) {
-    if(gained.length===1 && gained[0].id==='chess_item_1_03_e_a' && bench(gained[0]) && !lost.length)
-      coin={...gained[0],gain:1,merged:false};
-    else if(gained.length===1 && gained[0].id==='chess_item_1_03_e_b' && bench(gained[0]) &&
-      lost.length===1 && lost[0].id==='chess_item_1_03_e_a' && bench(lost[0])) {
-      consumedCoin=lost[0].uid;
-      coin={...gained[0],gain:2,merged:true,mergedFrom:consumedCoin};
-    }
-  }
-  if(gained.length!==(coin ? 1 : 0) || lost.length!==(consumedCoin!==null ? 1 : 0))
-    return fail('普通购买产生未知赠装或丢失旧装备；未授权出售');
+  const gift=candidate.id==='chess_char_3_03_a' && !merged ? auditSwireCoinGift(before,after) : null;
+  if(gift ? !gift.ok : gained.length>0 || lost.length>0)
+    return fail(gift?.reason || '普通购买产生未知赠装或丢失旧装备；未授权出售');
+  const coin=gift?.coin || null, changedCoins=new Set(gift?.changedUids || []);
   if(before.items.some(item=>{
-    if(item.uid===consumedCoin)return false;
+    if(changedCoins.has(item.uid))return false;
     const next=after.itemByUid.get(item.uid);
     return !next || next.id!==item.id || (consumed.has(item.carrierUid) ? !bench(next) :
       next.area!==item.area || (next.carrierUid ?? null)!==(item.carrierUid ?? null));
   }))return fail('普通购买期间旧装备迁移或合成返装无法核验');
-  return {ok:true,parent,merged,mergedKeepReward:merged,consumedUids:[...consumed],coin};
+  return {ok:true,parent,merged,mergedKeepReward:merged,consumedUids:[...consumed],coin,
+    coins:gift?.coins || [],coinConsumedUids:gift?.changedUids || []};
 }
 
 // The stamp remains exact except for independently allowed hand/board placement of OTHER units.

@@ -1,6 +1,6 @@
-// MV3 background: origin-scoped lease AND bounded local audit trail. Never injects a page automatically.
+// MV3 background: scoped lease/audit trail; Electron may initialize UI, never arm trading automatically.
 const LEASE_MS = 15000;
-const LOG_LIMIT = 300;
+const LOG_LIMIT = 1000;
 const WORKER_VERSION = chrome.runtime.getManifest().version;
 function randomId() {
   if (typeof globalThis.crypto?.getRandomValues !== 'function') throw new Error('浏览器不支持安全随机数，拒绝建立运行锁');
@@ -114,13 +114,50 @@ async function handle(message, sender) {
   if (['log.read', 'log.append', 'log.clear'].includes(message?.type)) return handleLog(message, ctx);
   return { ok: false, reason: '未知操作' };
 }
+async function probeDesktopPage(tab) {
+  if (!Number.isInteger(tab?.id) || !/^https?:\/\//i.test(tab.url || '')) return { supported: false };
+  const [probe] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: () => {
+    const hasSource = [...document.scripts].some(script => {
+      try { const url = new URL(script.src, location.href); return url.origin === location.origin && url.pathname.endsWith('/js/main.js'); }
+      catch { return false; }
+    });
+    const sp = globalThis.__SP__;
+    const hasGameApi = !!sp && typeof sp === 'object' && sp.version === 1 &&
+      typeof sp.store?.get === 'function' && typeof sp.store?.subscribe === 'function' && typeof sp.net?.request === 'function';
+    return { supported: hasSource || hasGameApi, desktop: /\bSPDesktop\//.test(navigator.userAgent) };
+  }});
+  return probe?.result || { supported: false };
+}
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  handle(message, sender).then(reply, error => reply({ ok: false, reason: error?.message || '后台操作异常' }));
+  const task = message?.type === 'desktop.probe'
+    ? probeDesktopPage(sender.tab)
+    : message?.type === 'desktop.ensureWorkbench'
+      ? (async () => {
+          if (sender.frameId !== 0) throw new Error('自动初始化仅允许顶层游戏页面');
+          const probe=await probeDesktopPage(sender.tab);
+          if (!probe.supported || !probe.desktop) throw new Error('Electron游戏接口尚未就绪');
+          await openWorkbench(sender.tab,{toggle:false});
+          await markTab(sender.tab,null);
+          return {ok:true};
+        })()
+      : message?.type === 'desktop.openWorkbench'
+      ? (async () => {
+          if (!Number.isInteger(sender.tab?.id)) throw new Error('没有找到当前游戏页面');
+          await openWorkbench(sender.tab);
+          await markTab(sender.tab, null);
+          return { ok: true };
+        })()
+      : handle(message, sender);
+  task.then(reply, error => reply({ ok: false, reason: error?.message || '后台操作异常' }));
   return true;
 });
 
 // 打开工作台：识别源码版（js/main.js）与打包版（游戏自身暴露的 globalThis.__SP__）两种网页。
-async function openWorkbench(tab) {
+function openWorkbench(tab,{toggle=true}={}) {
+  // Auto startup and a simultaneous user click must not install two bridges/iframes.
+  return serial(`workbench:${tab.id}`,()=>installWorkbench(tab,{toggle}));
+}
+async function installWorkbench(tab,{toggle}) {
   const version = chrome.runtime.getManifest().version;
   const [result] = await chrome.scripting.executeScript({target:{tabId:tab.id},world:'ISOLATED',func:()=>{
     if (window.top !== window) return {error:'仅支持顶层页面'};
@@ -135,7 +172,7 @@ async function openWorkbench(tab) {
   if (!page || page.error) throw new Error(page?.error || '页面校验失败');
   if (page.installed) {
     if (page.version!==version) throw new Error('本页仍为旧版工作台，请在安全时自行刷新页面后再打开');
-    await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>document.getElementById('wei-cardkeeper-host-v1')?.dispatchEvent(new CustomEvent('wei:toggle'))});
+    if(toggle)await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>document.getElementById('wei-cardkeeper-host-v1')?.dispatchEvent(new CustomEvent('wei:toggle'))});
     return;
   }
   // MAIN world: 只读探测。打包版没有 js/main.js，但游戏会挂出 __SP__（界面正在用的同一份 store / net）。
@@ -178,7 +215,7 @@ async function reconnect(sender) {
   try { await openWorkbench(tab); await markTab(tab,null); return {ok:true}; }
   catch (error) { await markTab(tab,error); return {ok:false,reason:error.message}; }
 }
-// Explicit toolbar action, no popup navigation and no automatic injection.
+// Toolbar remains an explicit toggle; only a verified Electron page gets automatic UI initialization.
 chrome.action?.onClicked?.addListener(async tab => {
   if (!Number.isInteger(tab.id) || !/^https?:\/\//i.test(tab.url || '')) return;
   try { await openWorkbench(tab); await markTab(tab,null); }

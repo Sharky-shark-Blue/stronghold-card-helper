@@ -1,6 +1,6 @@
 import { normalizeActionRefill } from './action-overflow.js';
 import { sameUnitWithPlacement } from './placement.js';
-// Packaging gifts are retained, never added to the automatic sale ledger.
+// Only audited fresh packaging outputs may enter the automatic sale ledger.
 function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems = null } = {}) {
   const fail = reason => ({ ok:false, reason });
   if (!before?.ok || !after?.ok || before.identity !== after.identity) return fail('卖出期间对局已改变');
@@ -41,7 +41,7 @@ function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems =
   if(before.units.some(unit=>unit.uid!==uid && after.unitByUid.has(unit.uid) &&
     !sameUnitWithPlacement(unit,after.unitByUid.get(unit.uid))))
     return fail('包装赠员期间旧干员发生未知变化；未自动出售');
-  const consumed=new Set();
+  const consumed=new Set(), packagingMerges=[];
   for(const gift of appeared){
     const rec=chess[gift.id], base=(typeof chess[gift.id]?.baseId==='string' ? chess[gift.id].baseId : gift.id), normal=chess[base];
     const rule=rules.findIndex(r=>r.base===base || r.bonds?.some(bond=>normal?.bonds?.includes(bond)));
@@ -53,7 +53,9 @@ function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems =
       if(normal.goldenId!==gift.id || need>99)return fail('包装赠员的合成规则无法核验');
       const old=vanished.filter(unit=>!consumed.has(unit.uid) && unit.base===base && !unit.golden);
       if(old.length<need-1)return fail('包装赠员合成所消耗的普通干员无法核验');
-      for(const unit of old.slice(0,need-1))consumed.add(unit.uid);
+      const parents=old.slice(0,need-1);
+      for(const unit of parents)consumed.add(unit.uid);
+      packagingMerges.push({uid:gift.uid,consumedUids:parents.map(unit=>unit.uid)});
     } else if(gift.id!==base)return fail('包装赠员不是可核验的初始同名干员');
   }
   if(vanished.some(unit=>!consumed.has(unit.uid)))return fail('除出售和包装赠员合成外，还有旧 UID 消失；已停止');
@@ -69,7 +71,24 @@ function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems =
   const packagingReward=merged && isPackagingMergeOffer(after.rewardOffer,chess,before.shopLevel);
   const pineconeReward=!merged && sold.id==='chess_char_3_10_a' && isPineconeSaleOffer(after.rewardOffer,chess);
   if(after.rewardOffer && !packagingReward && !pineconeReward)return fail('包装赠员后奖励来源、等阶、候选或队列无法核验；未自动选卡');
-  return {ok:true,packagingGifts:appeared,packagingMerged:merged,packagingReward,pineconeReward};
+  return {ok:true,packagingGifts:appeared,packagingMerged:merged,packagingMerges,packagingReward,pineconeReward};
+}
+
+// A fresh merged UID is NOT proof that its old ingredients were ours to sell.
+// Keep/manual/board protection and unknown old ingredients must propagate to the output.
+export function packagingGiftDisposition(audit,before,{keep=[],authorizedUids=[],protectedUids=[]}={}) {
+  const queued=[],kept=[],authorized=new Set(authorizedUids),protectedSet=new Set(protectedUids),bases=new Set(keep);
+  if(audit?.ok!==true || !before?.ok)return {queued,kept};
+  for(const gift of audit.packagingGifts || []){
+    const merged=audit.packagingMerges?.find(entry=>entry.uid===gift.uid);
+    const safeMerge=!gift.golden || merged?.consumedUids?.length>0 && merged.consumedUids.every(uid=>
+      authorized.has(uid) && !protectedSet.has(uid) && before.unitByUid.get(uid)?.equipped===0 &&
+      ['hand','temp'].includes(before.unitByUid.get(uid)?.area));
+    const safe=before.unitByUid.has(gift.uid)===false && ['hand','temp'].includes(gift.area) &&
+      gift.equipped===0 && !bases.has(gift.base) && !protectedSet.has(gift.uid) && safeMerge;
+    (safe ? queued : kept).push(gift);
+  }
+  return {queued,kept};
 }
 
 export function isPackagingMergeOffer(offer, chess, shopLevel) {

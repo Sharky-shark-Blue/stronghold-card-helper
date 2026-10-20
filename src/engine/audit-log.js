@@ -16,7 +16,7 @@ export function createAuditLog({ sendMessage, origin, clientVersion, onChange = 
     if (response?.ok !== true || !Array.isArray(response.entries)) {
       throw new Error(response?.reason || '日志服务未返回有效数据');
     }
-    entries = response.entries.slice(-300);
+    entries = response.entries.slice(-1000);
     notify();
     return entries.slice();
   }

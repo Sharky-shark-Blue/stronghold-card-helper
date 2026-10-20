@@ -1,7 +1,7 @@
 import { mergeOfferStamp } from './packaging.js';
 // Isolated-world transport. All game state/actions live behind main-bridge.js on the clicked tab.
 // chrome.runtime is used only for the extension's single-runner lease; no fixed server host is requested.
-import { itemHoldingAllows } from './item-policy.js';
+import { itemHoldingAllows, planItemMerge } from './item-policy.js';
 import { operatorBaseId, inspectInventory } from './inventory.js';
 import { canSellSurplusGift } from './flametail-flow.js';
 const EXT_CHANNEL = 'wei.runtime.v1';
@@ -186,30 +186,16 @@ export function createSpuiTransport(config, getPlan, chess={}) {
           priv.hand?.length >= 10 && priv.hand.every(Boolean)) {
         throw new Error('道具槽位、次数、资金门槛或手牌区在买入前已变化');
       }
-      // Every identical copy counts toward a merge, including equipment issued to an operator.
-      const bench = [...(priv.hand || []), ...(priv.temp || [])].filter(item => item?.kind === 'item' && item.id === offer.id);
-      const issued = (priv.board || []).concat(priv.hand || [], priv.temp || [])
-        .flatMap(piece => piece?.kind === 'chess' && Array.isArray(piece.items) ? piece.items : [])
-        .filter(item => item?.id === offer.id);
-      const holdings = [...(priv.hand || []), ...(priv.temp || []), ...(priv.board || [])].filter(piece => piece?.kind === 'item')
-        .concat((priv.board || []).concat(priv.hand || [], priv.temp || []).flatMap(piece =>
-          piece?.kind === 'chess' && Array.isArray(piece.items) ? piece.items.map(item => ({ ...item, area: 'equipped' })) : []));
-      if (!itemHoldingAllows(holdings,rule)) throw new Error('道具实时持有目标已达到或库存无法核对');
-      const merge = expected.merge || null;
-      if (merge) {
-        const consumed = Array.isArray(merge.consumed) ? merge.consumed : [];
-        if (typeof merge.goldenId !== 'string' || !Number.isInteger(merge.need) || consumed.length !== merge.need - 1 ||
-            issued.length || bench.length !== consumed.length ||
-            consumed.some(uid => !bench.some(item => item.uid === uid))) {
-          throw new Error('道具合成所需的同名旧件已变化，或会消耗已配发装备；不会自动买入');
-        }
-      } else if (bench.length + issued.length > 0 && rule.merge?.mergeable !== false &&
-                 !(rule.merge?.mergeable === true && bench.length + issued.length + 1 < rule.merge.need)) {
-        throw new Error('已持有同名道具且合成结果无法确认；不会自动买入');
-      }
+      const inventory=inspectInventory(priv,chess);
+      if(!inventory.ok || !itemHoldingAllows(inventory.items,rule))throw new Error('道具实时持有目标已达到或库存无法核对');
+      const planned=planItemMerge(inventory,offer.id,rule.merge,rule);
+      if(!planned.ok)throw new Error(planned.reason);
+      const merge=planned.merge;
+      if(JSON.stringify(expected.merge || null)!==JSON.stringify(merge))
+        throw new Error('道具合成材料、携带者或授权在下单前已变化；不会自动买入');
       const response = await ask('buy-item', {slot,expectedId:expected.id,expectedPrice:expected.price,
-        itemRule:{id:rule.id,enabled:true,limit:rule.limit,used:rule.used,minFunds:rule.minFunds,ownedTarget:rule.ownedTarget},
-        expectMerge: merge ? {goldenId:merge.goldenId,consumed:[...merge.consumed]} : null});
+        itemRule:{id:rule.id,enabled:true,limit:rule.limit,used:rule.used,minFunds:rule.minFunds,ownedTarget:rule.ownedTarget,allowEquippedMerge:rule.allowEquippedMerge===true},
+        expectMerge: merge ? {...merge,consumed:[...merge.consumed]} : null});
       if (!Number.isInteger(response.result?.itemUid) || response.result.itemUid < 0) {
         throw new Error('道具买入已发送但未收到可信 UID；不会自动重试');
       }

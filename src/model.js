@@ -40,6 +40,7 @@ function itemRecords(raw) {
     const entry = { id, limit, enabled: rec.enabled === true, minFunds: optionalFunds(rec.minFunds),
       ...(rec.enabled !== true && rec.capPaused === true ? { capPaused: true } : {}),
       ...(optionalLimit(rec.ownedTarget) !== null ? { ownedTarget: optionalLimit(rec.ownedTarget) } : {}),
+      ...(id==='chess_item_5_07_e_a' && rec.allowEquippedMerge===true ? {allowEquippedMerge:true}: {}),
       ...(rec.autoUse === true ? { autoUse: true } : {}) }; // 自动使用 is opt-in and independent of buying.
     out.push(known ? entry : { ...entry, name });
     seen.add(id); names.add(key);
@@ -322,6 +323,13 @@ export function setItemAutoUse(plan, id, on) {
     const { autoUse, ...rest } = x;
     return on === true ? { ...rest, autoUse: true } : rest;
   }) }, changed: true };
+}
+// Dedicated opt-in; never accepts this permission for another item or turns buying/auto-use on.
+export function setItemEquippedMerge(plan,id,on) {
+  if(id!=='chess_item_5_07_e_a')return {plan,changed:false};
+  const item=plan.items.find(entry=>entry.id===id);
+  if(!item || (item.allowEquippedMerge===true)===(on===true))return {plan,changed:false};
+  return {plan:normalizePlan({...plan,items:plan.items.map(entry=>entry.id===id?{...entry,allowEquippedMerge:on===true}:entry)}),changed:true};
 }
 export const itemCapReached = (plan, item) => item.limit != null && (plan.itemSession?.used?.[item.id] || 0) >= item.limit;
 export function setItemOwnedTarget(plan, id, value) {

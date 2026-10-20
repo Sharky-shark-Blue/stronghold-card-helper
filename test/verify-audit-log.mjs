@@ -62,8 +62,11 @@ for (const [kind, meta] of [
   assert.equal(response.entries.at(-1).kind, kind);
 }
 assert.equal((await call({ type: 'log.append', entry: { kind: 'reward_pick', summary: 'x' } })).ok, false);
-for(let i=0;i<304;i++) await call({type:'log.append',entry:{kind:'info',summary:`测试 ${i}`}});
-assert.equal((await first.load()).length,300);
+for(let i=0;i<1004;i++) await call({type:'log.append',entry:{kind:'info',summary:`测试 ${i}`}});
+assert.equal((await first.load()).length,1000);
+assert.equal(first.entries[0].summary,'测试 4');
+assert.equal(first.entries.at(-1).summary,'测试 1003');
+assert.equal(items.get('wei.audit.v1:http://one.example:4000').length,1000);
 assert.equal((await different.load()).length,1);
 await first.clear();
 assert.equal((await first.load()).length,0);
@@ -85,6 +88,13 @@ const payload=JSON.parse(await exportedBlob.text());
 assert.equal(payload.server,'https://another.example:7000');
 assert.equal(payload.entries.length,1);
 assert(downloadName.endsWith('.json'));
+const exportCapacity=createAuditLog({origin:'https://capacity.example',clientVersion:VERSION,
+  sendMessage:async()=>({ok:true,entries:Array.from({length:1005},(_,i)=>({id:String(i),kind:'info',summary:'capacity '+i}))})});
+assert.equal(await exportCapacity.exportJSON(),1000);
+const capacityPayload=JSON.parse(await exportedBlob.text());
+assert.equal(capacityPayload.entries.length,1000);
+assert.equal(capacityPayload.entries[0].id,'5');
+assert.equal(capacityPayload.entries.at(-1).id,'1004');
 URL.createObjectURL=originalCreate;
 delete globalThis.document;
 console.log('audit log: bounded per-origin persistence, concurrent writes, JSON export, sanitization and failure propagation passed');

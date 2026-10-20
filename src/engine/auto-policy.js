@@ -1,4 +1,5 @@
 import { canReverseFullKeep } from './flametail-flow.js';
+import { auditCoinAction, gainTraitRepeats } from './coin-audit.js';
 import { auditFlametailPurchase } from './flametail-audit.js';
 import { sameUnitWithPlacement } from './placement.js';
 import { auditOrdinaryPurchase, planRetainedMerge } from './trade-audit.js';
@@ -75,6 +76,7 @@ export function inspectMatch(state, chess, { allowReward = false } = {}) {
   if (!inventory.ok) return inventory;
   return { ...inventory, identity: `${room.code}|${me}|${pub.round}`,
     funds: priv.funds, slots: priv.shop.slots, refreshPrice: priv.shop.refreshPrice, shopLevel:priv.shop.level,
+    gainRepeats:gainTraitRepeats(priv.bonds),
     rewardOffer: Array.isArray(rewardOffer?.slots) && rewardOffer.slots.length ? rewardOffer : null };
 }
 
@@ -249,22 +251,7 @@ export function auditReward(before, after, chosen) {
 }
 
 export function auditCoinUse(before, after, parent, coin) {
-  const fail = reason => ({ ok: false, reason });
-  const gain = coin?.id === SWIRE_COIN_GOLDEN_ID ? 2 : 1;
-  if (!before?.ok || !after?.ok || before.identity !== after.identity ||
-      after.funds !== before.funds + gain ||
-      (coin.id !== SWIRE_COIN_ID && coin.id !== SWIRE_COIN_GOLDEN_ID) ||
-      after.itemByUid.has(coin.uid) || after.unitByUid.get(parent.uid)?.id !== parent.id) {
-    return fail('盟约之币使用后的资金或 UID 无法核对');
-  }
-  if (before.units.length !== after.units.length ||
-      before.units.some(x => after.unitByUid.get(x.uid)?.id !== x.id) ||
-      after.items.length !== before.items.length - 1 ||
-      before.items.some(x => x.uid !== coin.uid &&
-        (after.itemByUid.get(x.uid)?.id !== x.id || after.itemByUid.get(x.uid)?.carrierUid !== x.carrierUid))) {
-    return fail('盟约之币使用后库存出现额外变化');
-  }
-  return { ok: true, gain };
+  return auditCoinAction(before, after, parent, coin);
 }
 
 /** Every normal/golden 盟约之币 sitting in hand or temp, normal coins first. */

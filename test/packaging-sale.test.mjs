@@ -9,14 +9,14 @@ function snap(hand=[],board=[unit(10,A,[{uid:100,id:pack}])]) {
   return inspectMatch({connection:{status:'online'},me:{playerId:'me'},room:{code:'room',inMatch:true,seats:[{playerId:'me'}]},
     match:{public:{phase:'PREP',round:2,players:[{playerId:'me'}]},private:{alive:true,ready:false,funds:20,hand,board,temp:[],shop:{slots:[],refreshPrice:1}}}},chess);
 }
-test('装备包装方案触发同名赠员时允许继续，赠员不进自动出售队列',()=>{
+test('装备包装方案触发同名赠员时核验额外新UID',()=>{
   const before=snap([unit(1,B)]), after=snap([unit(2,A)]);
   const result=auditSale(before,after,1,{chess,gameItems});
   assert.equal(result.ok,true);assert.deepEqual(result.packagingGifts.map(g=>g.uid),[2]);
   assert.equal(result.packagingMerged,false);
   assert.equal(auditSale(before,snap(),1,{chess,gameItems}).ok,true);
 });
-test('包装赠员与两份普通自动合成精锐的守恒可核对，精锐保留',()=>{
+test('包装赠员与两份普通自动合成精锐的守恒及材料UID可核对',()=>{
   const before=snap([unit(1,B),unit(3),unit(4)]),after=snap([unit(5,G)]);
   const result=auditSale(before,after,1,{chess,gameItems});
   assert.equal(result.ok,true);assert.equal(result.packagingMerged,true);

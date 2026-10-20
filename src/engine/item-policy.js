@@ -19,8 +19,9 @@ export function itemMergeRule(id, lookup) {
 }
 
 // User choice: buying may merge with identical copies lying in hand/temp, but never with
-// equipment already issued to an operator. The server consumes temp copies, then hand, then equipped.
-export function planItemMerge(ctx, id, rule) {
+// issued equipment, except the dedicated opt-in for ordinary commercial packaging.
+// The server consumes temp copies, then hand, then equipped.
+export function planItemMerge(ctx, id, rule, permission = {}) {
   const copies = (ctx?.items || []).filter(item => item.id === id);
   if (rule === null || rule === undefined) {
     return copies.length ? { ok: false, reason: '游戏道具数据缺少合成规则，已持有同名道具时不自动买入' }
@@ -29,9 +30,16 @@ export function planItemMerge(ctx, id, rule) {
   if (rule.mergeable !== true || copies.length + 1 < rule.need) return { ok: true, merge: null };
   if (copies.length + 1 > rule.need) return { ok: false, reason: '同名道具数量已达合成数却未合成，状态无法确认' };
   const bench = [...copies.filter(item => item.area === 'temp'), ...copies.filter(item => item.area === 'hand')];
-  if (bench.length < rule.need - 1) return { ok: false, reason: '买入会与干员身上已配发的同名装备合成，已跳过' };
+  const authorized=id==='chess_item_5_07_e_a' && permission.allowEquippedMerge===true &&
+    rule.need===2 && rule.goldenId==='chess_item_5_07_e_b';
+  if (bench.length < rule.need - 1 && !authorized) return { ok: false, reason: '买入会与干员身上已配发的同名装备合成，已跳过' };
+  const consumed=[...bench,...(authorized?copies.filter(item=>item.area==='equipped'):[])].slice(0,rule.need-1);
+  if(consumed.length!==rule.need-1)return {ok:false,reason:'道具合成材料区域无法核对'};
+  const equipped=consumed.filter(item=>item.area==='equipped').map(item=>({uid:item.uid,carrierUid:item.carrierUid}));
+  if(equipped.some(item=>!Number.isInteger(item.carrierUid)||!ctx.unitByUid?.has(item.carrierUid)))
+    return {ok:false,reason:'包装已装备材料的携带者无法核对'};
   return { ok: true, merge: { need: rule.need, goldenId: rule.goldenId,
-    consumed: bench.slice(0, rule.need - 1).map(item => item.uid) } };
+    consumed: consumed.map(item => item.uid),...(equipped.length?{equipped}: {}) } };
 }
 
 export function itemHoldingAllows(items, rule) {
@@ -53,10 +61,10 @@ export function pickItemCandidate(ctx, plan) {
         !Number.isInteger(rule.used) || rule.used < 0 || rule.used >= (rule.limit ?? 9999) ||
         rule.minFunds !== null && ctx.funds <= rule.minFunds) continue;
     if (!itemHoldingAllows(ctx.items, rule)) continue;
-    const merging = planItemMerge(ctx, offer.id, rule.merge);
+    const merging = planItemMerge(ctx, offer.id, rule.merge, rule);
     if (!merging.ok) continue; // e.g. would consume issued equipment: skip, do not stop the run.
     return {slot, id:offer.id, price:offer.price, sourceId:rule.sourceId, name:rule.name,
-      ...(merging.merge ? { merge: merging.merge } : {})};
+      ...(merging.merge ? { merge: merging.merge, ...(merging.merge.equipped?.length?{allowEquippedMerge:true}: {}) } : {})};
   }
   return null;
 }
@@ -75,17 +83,26 @@ export function auditItemPurchase(before, after, chosen) {
        offer?.price !== after.slots[index]?.price || offer?.sold !== after.slots[index]?.sold))) {
     return fail('道具购买时其他商店槽发生变化');
   }
-  if (before.units.length !== after.units.length || before.units.some(unit => {
-    const found = after.unitByUid.get(unit.uid);
-    return !sameUnitWithPlacement(unit,found);
-  })) return fail('道具购买时干员 UID 或装备发生变化');
   const merge = chosen.merge || null, consumed = new Set(merge ? merge.consumed : []);
   if (merge && (!Array.isArray(merge.consumed) || consumed.size !== merge.need - 1 ||
       typeof merge.goldenId !== 'string')) return fail('道具合成预期不完整');
+  const issued=before.items.filter(item=>consumed.has(item.uid)&&item.area==='equipped');
+  const authorized=chosen.id==='chess_item_5_07_e_a'&&chosen.allowEquippedMerge===true&&
+    merge?.need===2&&merge.goldenId==='chess_item_5_07_e_b';
+  const equipped=issued.map(item=>({uid:item.uid,carrierUid:item.carrierUid}));
+  if(issued.length&&!authorized || JSON.stringify(merge?.equipped || [])!==JSON.stringify(equipped))
+    return fail('已装备包装合成缺少专属授权或材料/携带者证明不一致');
+  if(issued.some(item=>!Number.isInteger(item.carrierUid)||!before.unitByUid.has(item.carrierUid)))
+    return fail('已装备包装的携带者无法核对');
   if (merge && [...consumed].some(uid => {
     const old = before.itemByUid.get(uid);
-    return !old || old.id !== chosen.id || (old.area !== 'hand' && old.area !== 'temp') || after.itemByUid.has(uid);
+    return !old || old.id !== chosen.id || (old.area !== 'hand' && old.area !== 'temp' && !(authorized&&old.area==='equipped')) || after.itemByUid.has(uid);
   })) return fail('道具合成消耗的旧 UID 与预期不符');
+  if (before.units.length !== after.units.length || before.units.some(unit => {
+    const removed=issued.filter(item=>item.carrierUid===unit.uid).length;
+    const expected=removed?{...unit,equipped:unit.equipped-removed}:unit;
+    return !Number.isInteger(expected.equipped)||expected.equipped<0||!sameUnitWithPlacement(expected,after.unitByUid.get(unit.uid));
+  })) return fail('道具购买时干员 UID 或未授权装备发生变化');
   if (before.items.some(item => {
     if (consumed.has(item.uid)) return false;
     const found = after.itemByUid.get(item.uid);

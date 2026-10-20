@@ -21,7 +21,7 @@
   let offStore = null;
   let busy = false;
   let manualSupported=false,restoreManual=null;
-  const ledger = new Map(); // ONLY fresh UIDs from this bridge's buy/reward may be sold.
+  const ledger = new Map(); // ONLY fresh UIDs from audited buy/reward/packaging outputs may be sold.
   const coinLedger = new Map(); // ONLY a coin produced by this run's Swire buy may be used.
   const placementProtected=new Set();
   let placementPrevious=null;
@@ -124,6 +124,8 @@
             players: Array.isArray(pub.players) ? pub.players.map(x => ({ playerId: x?.playerId, autoplay: x.autoplay })) : null } : null,
           private: p ? { alive: p.alive, ready: p.ready, canReady:p.canReady, funds: p.funds,
             diy: diyPicks(p.diy),
+            bonds:Array.isArray(p.bonds) ? p.bonds.filter(bond=>bond?.bondId==='investShip')
+              .map(({bondId,active,layers})=>({bondId,active,layers})) : p.bonds,
             hand: Array.isArray(p.hand) ? p.hand.map(piece) : null,
             board: Array.isArray(p.board) ? p.board.map(piece) : null,
             temp: Array.isArray(p.temp) ? p.temp.map(piece) : null,
@@ -184,6 +186,7 @@
     const tradeSnapshot=ctx=>({ok:true,identity:ctx.identity,ownedCopies:ctx.ownedCopies,refreshPrice:ctx.p.shop.refreshPrice,shopLevel:ctx.p.shop.level,
       rewardOffer:ctx.p.shop.rewardOffer ? {...ctx.p.shop.rewardOffer,slots:ctx.p.shop.rewardOffer.slots.map(slot)} : null,
       slots:ctx.p.shop.slots.map(slot),hand:ctx.p.hand.map(piece),funds:ctx.p.funds,
+      gainRepeats:gainTraitRepeats(ctx.p.bonds),
       units:[...ctx.units].map(([uid,unit])=>({uid,...unit})),
       unitByUid:new Map([...ctx.units].map(([uid,unit])=>[uid,{uid,...unit}])),
       items:[...ctx.items].map(([uid,item])=>({uid,...item})),
@@ -348,9 +351,8 @@
           pendingReward={kind:'flametail_merge',identity:ctx.identity,stamp:stampOffer(after.p.shop.rewardOffer),
             drainUids:fresh.map(([uid])=>uid)};
       }
-      if(ordinaryAudit?.coin){
-        const coin=ordinaryAudit.coin;
-        if(coin.mergedFrom!=null)coinLedger.delete(coin.mergedFrom);
+      for(const uid of ordinaryAudit?.coinConsumedUids || [])coinLedger.delete(uid);
+      for(const coin of ordinaryAudit?.coins || []){
         coinLedger.set(coin.uid,{id:coin.id,parentUid:ordinaryAudit.parent.uid,identity:ctx.identity,
           ...(coin.mergedFrom!=null ? {mergedFrom:coin.mergedFrom} : {})});
       }
@@ -393,64 +395,28 @@
           throw new Error('道具实时持有目标已达到或无效，不会继续买入');
       }
       if (ctx.p.hand.length >= 10 && ctx.p.hand.every(Boolean)) throw new Error('手牌区已满');
-      // Identical copies merge on purchase (server: temp, then hand, then equipped). Only a merge
-      // that consumes hand/temp copies is allowed, and both worlds must expect the same one.
-      const copies = [...ctx.items].filter(([, item]) => item.id === offer.id);
-      const mergeRule = itemMergeRule(offer.id);
-      let merge = null;
-      if (!mergeRule) {
-        if (copies.length) throw new Error('游戏道具数据缺少合成规则，已持有同名道具；请手动处理');
-      } else if (mergeRule.mergeable && copies.length + 1 >= mergeRule.need) {
-        if (copies.length + 1 > mergeRule.need) throw new Error('同名道具数量已达合成数却未合成；请手动处理');
-        const bench = [...copies.filter(([, it]) => it.area === 'temp'), ...copies.filter(([, it]) => it.area === 'hand')];
-        if (bench.length < mergeRule.need - 1) throw new Error('买入会与已配发的同名装备合成；不会自动买入');
-        merge = { goldenId: mergeRule.goldenId, consumed: bench.slice(0, mergeRule.need - 1).map(([uid]) => uid) };
-      }
-      const expect = message.expectMerge || null;
-      if (!!merge !== !!expect || merge && (expect.goldenId !== merge.goldenId ||
-          !Array.isArray(expect.consumed) || expect.consumed.length !== merge.consumed.length ||
-          merge.consumed.some(uid => !expect.consumed.includes(uid)))) {
-        throw new Error('工作台与游戏页对道具是否合成的判断不一致；不会自动买入');
-      }
-      const consumed = new Set(merge ? merge.consumed : []);
-      const beforeSlots = ctx.p.shop.slots.map(slot);
-      const ok = await actions.buy(index);
-      if (ok !== true) throw new Error('游戏服务器拒绝道具买入');
-      const updated = await waitFor(s => s.match?.private?.shop?.slots?.[index]?.id === offer.id &&
-        s.match.private.shop.slots[index].sold === true);
-      if (!updated) throw new Error('道具买入后状态未确认；不会自动重复购买');
-      const after = context();
-      const shop = after.p.shop.slots;
-      if (after.identity !== ctx.identity || after.p.funds !== ctx.p.funds - offer.price ||
-          shop.length !== beforeSlots.length || shop[index]?.id !== offer.id ||
-          shop[index]?.kind !== 'item' || shop[index]?.sold !== true ||
-          beforeSlots.some((prior,i) => i !== index && JSON.stringify(slot(prior)) !== JSON.stringify(slot(shop[i])))) {
-        throw new Error('道具买入后对局、实际扣费或其他商店槽变化无法核对');
-      }
-      if (after.units.size !== ctx.units.size || [...ctx.units].some(([uid, before]) => {
-        const now = after.units.get(uid);
-        return !sameUnitWithPlacement(before,now);
-      }) || [...ctx.items].some(([uid, before]) => {
-        if (consumed.has(uid)) return after.items.has(uid);
-        const now = after.items.get(uid);
-        return !now || now.id !== before.id || now.area !== before.area || now.carrierUid !== before.carrierUid;
-      })) throw new Error('道具买入后原有干员或道具 UID 变化，已停止');
-      const fresh = [...after.items].filter(([uid]) => !ctx.items.has(uid));
-      if (merge) {
-        const made = fresh[0], list = made && made[1].area === 'temp' ? after.p.temp : after.p.hand;
-        if (fresh.length !== 1 || after.items.size !== ctx.items.size - consumed.size + 1 ||
-            made[1].id !== merge.goldenId || (made[1].area !== 'hand' && made[1].area !== 'temp') ||
-            !list.some(item => item?.uid === made[0] && item.kind === 'item' && item.id === merge.goldenId)) {
-          throw new Error('道具已买入并合成，但精锐道具 UID 无法唯一核对；不会自动重试');
-        }
-        return {itemUid:made[0],merged:true};
-      }
-      if (fresh.length !== 1 || after.items.size !== ctx.items.size + 1 ||
-          fresh[0][1].id !== offer.id || fresh[0][1].area !== 'hand' ||
-          !after.p.hand.some(item => item?.uid === fresh[0][0] && item.kind === 'item' && item.id === offer.id)) {
-        throw new Error('道具新 UID、ID 或手牌位置无法唯一核对；不会自动重试');
-      }
-      return {itemUid:fresh[0][0]};
+      const snapshot=ctx=>{
+        const snap=tradeSnapshot(ctx),items=snap.items.map(item=>({...item,carrierUid:item.carrierUid??null}));
+        return {...snap,items,itemByUid:new Map(items.map(item=>[item.uid,item]))};
+      };
+      const before=snapshot(ctx);
+      const planned=ItemMergeSafety.planItemMerge(before,offer.id,itemMergeRule(offer.id),rule);
+      if(!planned.ok)throw new Error(planned.reason);
+      const merge=planned.merge,expect=message.expectMerge || null;
+      if(!!merge!==!!expect || merge && (expect.goldenId!==merge.goldenId ||
+        !Array.isArray(expect.consumed) || JSON.stringify(expect.consumed)!==JSON.stringify(merge.consumed) ||
+        JSON.stringify(expect.equipped || [])!==JSON.stringify(merge.equipped || [])))
+        throw new Error('工作台与游戏页对道具合成材料/携带者的判断不一致；不会自动买入');
+      const ok=await actions.buy(index);
+      if(ok!==true)throw new Error('游戏服务器拒绝道具买入');
+      const updated=await waitFor(s=>s.match?.private?.shop?.slots?.[index]?.id===offer.id&&s.match.private.shop.slots[index].sold===true);
+      if(!updated)throw new Error('道具买入后状态未确认；不会自动重复购买');
+      const checked=ItemMergeSafety.auditItemPurchase(before,snapshot(context()),
+        {id:offer.id,slot:index,price:offer.price,merge,allowEquippedMerge:rule.allowEquippedMerge===true});
+      if(!checked.ok)throw new Error(checked.reason+'；道具可能已买入，不会自动重试');
+      // Removing the one explicitly-authorized item never authorizes selling its old carrier.
+      for(const part of merge?.equipped || []){ledger.delete(part.carrierUid);placementProtected.add(part.carrierUid);}
+      return {itemUid:checked.item.uid,...(checked.merged?{merged:true}: {})};
     }
     // Only the game's own ordinary shop refresh is supported. A rejected/ambiguous response
     // must never be retried automatically, since the server may already have charged the player.
@@ -502,26 +468,22 @@
       // User-confirmed scope: EVERY normal/golden coin in hand may be used, whatever its
       // origin (Swire gift, shop purchase, prep drop). The server replaces an old equipped
       // item even for consumables, so the target must keep a free equipment slot.
-      const amount = item.id === COIN_GOLDEN ? 2 : 1;
-      const funds = ctx.p.funds, before = ctx.items, beforeUnits = ctx.units;
+      const beforeCoin=tradeSnapshot(ctx);
+      const funds = ctx.p.funds;
       const ok = await actions.equip(itemUid, parentUid);
       if (ok !== true) throw new Error('盟约之币使用被游戏拒绝');
       coinLedger.delete(itemUid); // An acknowledged intent must NEVER be repeated after an ambiguous push.
       const updated = await waitFor(s => {
         const p = s?.match?.private;
         return !!p && (p.funds !== funds ||
-          ![...p.hand, ...p.board, ...p.temp].some(x => x?.uid === itemUid));
+          ![...p.hand, ...p.board, ...p.temp].some(x => x?.uid === itemUid && x?.id === item.id));
       });
       if (!updated) throw new Error('盟约之币可能已使用，但库存回执未确认；不会重复使用');
       const after = context();
-      if (after.identity !== ctx.identity || after.p.funds !== funds + amount ||
-          after.units.size !== beforeUnits.size || [...beforeUnits].some(([uid,u]) => after.units.get(uid)?.id !== u.id) ||
-          after.items.size !== before.size - 1 || after.items.has(itemUid) ||
-          [...before].some(([uid,it]) => uid !== itemUid &&
-            (after.items.get(uid)?.id !== it.id || after.items.get(uid)?.carrierUid !== it.carrierUid))) {
-        throw new Error('盟约之币使用后的资金或库存不符合预期，停止后续交易');
-      }
-      return { amount };
+      const checked=auditCoinAction(beforeCoin,tradeSnapshot(after),
+        beforeCoin.unitByUid.get(parentUid),beforeCoin.itemByUid.get(itemUid));
+      if(!checked.ok)throw new Error(checked.reason);
+      return { amount:checked.gain, merged:checked.merged, ...(checked.coin?{coinUid:checked.coin.uid}:{}) };
     }
     // 自动使用 (user opt-in per item): a consume-on-equip item from hand/temp onto an owned board/hand
     // operator with a free slot. Independent MAIN-world copy of item-policy.js itemUseRule.
@@ -645,7 +607,7 @@
       observePlacement();
       if(placementProtected.has(uid))return {uid,cancelled:'placement'};
       const entry = ledger.get(uid);
-      if (!entry) throw new Error('该 UID 并非插件本次买入或选卡产生，禁止出售');
+      if (!entry) throw new Error('该 UID 并非插件本次核验的买入、选卡或包装赠员，禁止出售');
       const proof=pendingReward;
       const drain=message.expectedSale?.pendingMergeStamp!=null;
       const ctx = context({allowReward:drain});
@@ -676,6 +638,21 @@
       const saleAfter=context({allowReward:true});
       const packaging=(drain ? auditPendingMergeSale : auditPackagingSale)(saleBefore,tradeSnapshot(saleAfter),uid,{chess,gameItems:itemData});
       if(!packaging.ok)throw new Error(packaging.reason);
+      // Audit is the authority, never appearance alone. Unknown old merge ingredients stay protected.
+      const disposition=packagingGiftDisposition(packaging,saleBefore,{keep:bases(message.keep),
+        authorizedUids:[...ledger].filter(([id,entry])=>entry.identity===ctx.identity && entry.equipped===0 &&
+          sameUnitWithPlacement(entry,ctx.units.get(id))).map(([id])=>id),protectedUids:[...placementProtected,
+          ...[...ledger].filter(([,entry])=>entry.protected).map(([id])=>id)]});
+      const keptGiftUids=new Set(disposition.kept.map(gift=>gift.uid));
+      for(const gift of packaging.packagingGifts || []){
+        ledger.set(gift.uid,{...saleAfter.units.get(gift.uid),identity:ctx.identity,
+          packagingGift:true,surplusGift:false,protected:keptGiftUids.has(gift.uid)});
+      }
+      for(const [oldUid] of ctx.units)if(!saleAfter.units.has(oldUid))ledger.delete(oldUid);
+      if(drain){
+        proof.drainUids=proof.drainUids.filter(id=>saleAfter.units.has(id));
+        proof.drainUids.push(...disposition.queued.map(gift=>gift.uid));
+      }
       // Proven refill only updates location on an EXISTING authorization, never creates one.
       for(const refilledUid of packaging.refilledUids || []){
         const saved=ledger.get(refilledUid), moved=saleAfter.units.get(refilledUid);

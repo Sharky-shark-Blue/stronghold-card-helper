@@ -2,7 +2,7 @@ import { auditManualTransaction } from './manual-policy.js';
 import { canSellSurplusGift } from './flametail-flow.js';
 import { sameUnitWithPlacement, changedDeployment } from './placement.js';
 import { makeSaleIntent } from './trade-audit.js';
-import { isPackagingMergeOffer, mergeOfferStamp, auditPendingMergeSale, auditOverflowPlacement } from './packaging.js';
+import { isPackagingMergeOffer, packagingGiftDisposition, mergeOfferStamp, auditPendingMergeSale, auditOverflowPlacement } from './packaging.js';
 import { pickPackagingMergeReward } from './auto-policy.js';
 // Serial, manually armed automation for the clicked game tab on any compatible origin.
 // All buy/sell/refresh requests use the same-origin game store/actions bridge. No server patch is used.
@@ -273,7 +273,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       return false;
     }
     if (!still || still.id !== candidate.id || still.slot !== candidate.slot) return true;
-    const mergeNote = candidate.merge ? '（将与手牌/整备区同名道具合成精锐）' : '';
+    const mergeNote = candidate.merge?.equipped?.length ? '（已明确授权：消耗已装备普通包装合成精锐）' : candidate.merge ? '（将与手牌/整备区同名道具合成精锐）' : '';
     report('working', `正在买入道具 ${name}${mergeNote} · 实价 ${candidate.price}`);
     let receipt,uid;
     try { receipt = await buyItem(candidate.slot, { id:candidate.id, price:candidate.price, merge:candidate.merge || null,planStamp:JSON.stringify(getPlan()) }); }
@@ -295,6 +295,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     if (!checked.ok || checked.item.uid !== uid) {
       stop(`道具 ${name}：${checked.reason || '主世界与工作台核对的 UID 不同'}；不重试，请人工核对次数`); return false;
     }
+    for(const part of candidate.merge?.equipped || []){settingsProtected.add(part.carrierUid);placementProtected.add(part.carrierUid);}
     totals.bought++;
     let counted;
     try { counted=await onRecordPurchase({kind:'item',sourceId:receipt?.sourceId || candidate.sourceId,realId:candidate.id,uid,epoch:receipt?.epoch ?? getPlan().epoch}); }
@@ -364,7 +365,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
     const pushed = await waitFor(state => {
       const snap = inspectMatch(state, chess);
       return snap.ok && snap.identity === identity &&
-        (!snap.itemByUid.has(coin.uid) || snap.funds !== ready.funds);
+        (snap.itemByUid.get(coin.uid)?.id !== coin.id || snap.funds !== ready.funds || snap.items.length !== ready.items.length);
     });
     if (!running || mine !== generation) return null;
     if (!pushed) {
@@ -384,7 +385,9 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       return latest;
     }
     try {
-      await writeAudit('coin_ok', `盟约之币已核对 · UID ${coin.uid} · 资金 +${checked.gain}`,
+      await writeAudit('coin_ok', checked.merged
+        ? `盟约之币合并已核对 · UID ${coin.uid} → 金币 UID ${checked.coin.uid}，继续使用金币`
+        : `盟约之币已核对 · UID ${coin.uid} · 资金 +${checked.gain}`,
         { itemUid: coin.uid, targetUid: target.uid, amount: checked.gain });
     } catch (error) { stop(`赠币使用后日志保存失败：${error?.message || '存储不可用'}；停止后续交易`); return null; }
     return running && mine === generation ? used : null;
@@ -548,7 +551,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
 
   async function freeFlametailRewardSpace(before,audit,keep,mine) {
     let current=before;
-    const soldEarly=new Set(), candidates=[...audit.gifts,audit.parent], gifts=new Set(audit.gifts.map(u=>u.uid));
+    const soldEarly=new Set(), candidates=[...audit.gifts,audit.parent], gifts=new Set(audit.gifts.map(u=>u.uid)), packagingGifts=[];
     const expectedOffer=mergeOfferStamp(before.rewardOffer);
     function retain(snap,unit){
       const plan=getPlan(), protectedBases=new Set([...keep,...transactionKeeps,...keepBases(plan,chess)]);
@@ -561,7 +564,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       const placement=auditOverflowPlacement(current,latest,chess);
       if(!placement.ok){stop(placement.reason);return null;}
       current=latest;
-      if(current.hand.some(piece=>!piece) || current.hand.length<10)return {after:current,soldEarly};
+      if(current.hand.some(piece=>!piece) || current.hand.length<10)return {after:current,soldEarly,packagingGifts};
       const unit=candidates.find(u=>{
         const now=current.unitByUid.get(u.uid);
         return !soldEarly.has(u.uid) && now && now.id===u.id && ['hand','temp'].includes(now.area) &&
@@ -612,7 +615,13 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       const audited=auditPendingMergeSale(current,after,unit.uid,{chess,gameItems});
       if(!audited.ok){stop(audited.reason);return null;}
       soldEarly.add(unit.uid);totals.sold++;
-      if(audited.packagingGifts?.length)totals.kept+=audited.packagingGifts.length;
+      if(audited.packagingGifts?.length){
+        const disposition=packagingGiftDisposition(audited,current,{keep:[...keep,...transactionKeeps,...keepBases(getPlan(),chess)],
+          authorizedUids:candidates.map(u=>u.uid),protectedUids:[...settingsProtected,...placementProtected]});
+        for(const gift of disposition.kept)settingsProtected.add(gift.uid);
+        packagingGifts.push(...audited.packagingGifts);candidates.push(...audited.packagingGifts);
+        if(packagingGifts.length>128){stop('包装赠员连续产生超出单次安全上限，已停止；剩余新UID未继续出售');return null;}
+      }
       try{await writeAudit('sell_ok',`爆仓腾位已核对 · UID ${unit.uid}，原晋升奖励保持未领取`,
         {uid:unit.uid,operatorId:unit.id,refilledUids:audited.refilledUids,packagingGiftUids:audited.packagingGifts?.map(u=>u.uid)});}
       catch(error){stop(`腾位已完成但日志无法保存：${error?.message || '存储不可用'}`);return null;}
@@ -812,11 +821,11 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       } catch (error) { stop(`买入已完成但核对日志未保存：${error?.message || '存储不可用'}；不会自动出售`); return; }
       if (!running || mine !== generation) return;
       let current=after, promotion=null;
-      let soldEarly=new Set();
+      let soldEarly=new Set(), overflowPackaging=[];
       if(audit.mergedGift && current.hand.length>=10 && current.hand.every(Boolean)){
         const drained=await freeFlametailRewardSpace(current,audit,keep,mine);
         if(!drained)return;
-        current=drained.after;soldEarly=drained.soldEarly;
+        current=drained.after;soldEarly=drained.soldEarly;overflowPackaging=drained.packagingGifts;
       }
       if(audit.mergedGift || audit.mergedKeepReward){
         promotion=audit.mergedKeepReward ? await takeStrictMergeReward(current,mine,'keep') :
@@ -829,14 +838,14 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
       if(audit.mergedKeepReward)keep.add(audit.parent.base);
       if(audit.coin){
         current=await useOneCoin(current,audit.coin,[audit.parent.uid],mine,
-          audit.coin.merged ? '诗怀雅赠币与旧币合成出的金币' : '本次诗怀雅赠送的盟约之币');
+          audit.coin.merged ? '诗怀雅赠币合成出的金币' : '本次诗怀雅赠送的盟约之币');
         if(!current)return;
       }
       current=await drainCoins(current,mine);
       if(!current)return;
       // Gift first, then the verified promotion card, then the source Flametail;
       // a later Pinecone reward can be spliced into this same protected queue.
-      const saleQueue = [...audit.gifts, ...(promotion ? [promotion.unit] : []), audit.parent]
+      const saleQueue = [...audit.gifts, ...overflowPackaging, ...(promotion ? [promotion.unit] : []), audit.parent]
         .filter(unit=>!soldEarly.has(unit.uid) && current.unitByUid.has(unit.uid));
       const quotaGifts=new Set(candidate.id===FLAMETAIL_ID ?
         [...audit.gifts.map(gift=>gift.uid),...(promotion ? [promotion.unit.uid] : [])] : []);
@@ -876,7 +885,7 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
           current = latest;
           continue;
         }
-        // Last-second guard: only a fresh UID approved by a purchase/reward audit may reach sell().
+        // Last-second guard: only a fresh UID approved by purchase/reward/packaging audits may reach sell().
         const unitName = chess[unit.id]?.name || unit.id;
         try { await writeAudit('sell_request', `准备出售本轮授权 ${unitName} · UID ${unit.uid}`,
           { operatorId: unit.id, uid: unit.uid }); }
@@ -933,13 +942,17 @@ export function createAutoController({ read, subscribe, buy, buyItem, sell, refr
         packagingPending=saleAudit.packagingReward===true;packagingSalePending=false;
         if(next.rewardOffer && !packagingPending && !pineconePending){stop('出售后奖励来源未核验');return;}
         if(saleAudit.packagingGifts?.length){
-          // A server-created gift/merge is not one of our purchased UIDs: never put it in saleQueue.
-          totals.kept+=saleAudit.packagingGifts.length;
-          try { await writeAudit('keep','商业包装方案赠员已核对并保留，不自动出售',
-            {giftUids:saleAudit.packagingGifts.map(gift=>gift.uid),merged:saleAudit.packagingMerged}); }
+          const disposition=packagingGiftDisposition(saleAudit,latest,{keep:[...keep,...transactionKeeps,...keepBases(getPlan(),chess)],
+            authorizedUids:saleQueue.map(u=>u.uid),protectedUids:[...settingsProtected,...placementProtected]});
+          for(const gift of disposition.kept)settingsProtected.add(gift.uid);
+          try { await writeAudit('gift','商业包装方案赠员来源已核对：名单外进入出售队列，保留/部署及旧卡合成保护优先',
+            {giftUids:saleAudit.packagingGifts.map(gift=>gift.uid),saleUids:disposition.queued.map(gift=>gift.uid),
+              protectedUids:disposition.kept.map(gift=>gift.uid),merged:saleAudit.packagingMerged}); }
           catch(error){stop(`包装赠员日志保存失败：${error.message}`);return;}
-          // A proven packaging merge can consume a future queue member. Its old UID must not be sold.
+          // Drop consumed old queue UIDs before adding their audited outputs. Never guess/reuse an old UID.
           for(let j=saleQueue.length-1;j>i;j--)if(!next.unitByUid.has(saleQueue[j].uid))saleQueue.splice(j,1);
+          saleQueue.splice(i+1,0,...saleAudit.packagingGifts);
+          if(saleQueue.length>256){stop('包装赠员连续产生超出单次安全上限，已停止；剩余新UID未继续出售');return;}
         }
         totals.sold++;
         try { await writeAudit('sell_ok', `出售已核对 ${unitName} · UID ${unit.uid}`,

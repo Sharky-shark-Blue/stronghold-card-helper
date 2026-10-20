@@ -1,6 +1,6 @@
-// Generated local runtime v0.3.3; edit src/runtime-host.js and src/engine/.
+// Generated local runtime v0.3.10; edit src/runtime-host.js and src/engine/.
 (() => {
-const BUILD_VERSION="0.3.3";
+const BUILD_VERSION="0.3.10";
 // Generated from 全静态条目ID索引.txt (items.json). Base IDs only: 普通 _e_a and special IDs; 升级 _e_b variants map to the same item name.
 const ITEM_CATALOGUE = Object.freeze([
   {"id":"chess_item_3_04_e_a","name":"炎国短刀","tier":3},
@@ -144,6 +144,7 @@ function itemRecords(raw) {
     const entry = { id, limit, enabled: rec.enabled === true, minFunds: optionalFunds(rec.minFunds),
       ...(rec.enabled !== true && rec.capPaused === true ? { capPaused: true } : {}),
       ...(optionalLimit(rec.ownedTarget) !== null ? { ownedTarget: optionalLimit(rec.ownedTarget) } : {}),
+      ...(id==='chess_item_5_07_e_a' && rec.allowEquippedMerge===true ? {allowEquippedMerge:true}: {}),
       ...(rec.autoUse === true ? { autoUse: true } : {}) }; // 自动使用 is opt-in and independent of buying.
     out.push(known ? entry : { ...entry, name });
     seen.add(id); names.add(key);
@@ -427,6 +428,13 @@ function setItemAutoUse(plan, id, on) {
     return on === true ? { ...rest, autoUse: true } : rest;
   }) }, changed: true };
 }
+// Dedicated opt-in; never accepts this permission for another item or turns buying/auto-use on.
+function setItemEquippedMerge(plan,id,on) {
+  if(id!=='chess_item_5_07_e_a')return {plan,changed:false};
+  const item=plan.items.find(entry=>entry.id===id);
+  if(!item || (item.allowEquippedMerge===true)===(on===true))return {plan,changed:false};
+  return {plan:normalizePlan({...plan,items:plan.items.map(entry=>entry.id===id?{...entry,allowEquippedMerge:on===true}:entry)}),changed:true};
+}
 const itemCapReached = (plan, item) => item.limit != null && (plan.itemSession?.used?.[item.id] || 0) >= item.limit;
 function setItemOwnedTarget(plan, id, value) {
   if (value !== null && optionalLimit(value) === null) throw new Error('道具持有目标须为 1–99 或留空');
@@ -632,7 +640,7 @@ function importConfig(input, current) {
     exportedAt: data.format === CONFIG_FORMAT && typeof data.exportedAt === 'string' ? data.exportedAt.slice(0, 40) : '' } };
 }
 
-return {STORAGE_KEY,CONFIG_FORMAT,exportConfig,importConfig,MAX_CONFIG_CHARS,DEFAULT_HOTKEY,normalizeHotkey,hotkeyFromEvent,hotkeyProblem,hotkeyLabel,matchesHotkey,GAME_DEFAULT_KEYS,normalizeGameKeys,gameHotkeyConflict,hotkeyIsTyping,KINDS,normalizePlan,filterOperators,updateFilter,toggleSelection,toggleLock,clearUnlocked,selectVisible,examplePlan,addedOperators,candidateOperators,addOperator,removeOperator,toggleDisabled,moveIconOperator,moveItemIcon,MAX_ICON_GRID_CELLS,iconGridSlots,previewIconGrid,moveIconToCell,allOperators,addNamedOperator,MAX_MANUAL_NAME_LENGTH,ITEMS,addItem,addNamedItem,setItemLimit,setItemOwnedTarget,observeItemMatch,setItemEnabled,toggleItemEnabled,setItemAutoUse,itemCapReached,setItemMinFunds,setKeepLimit,setKeepMinFunds,removeItem,recordItemPurchase,confirmPurchaseCount,nextItemMatch};
+return {STORAGE_KEY,CONFIG_FORMAT,exportConfig,importConfig,MAX_CONFIG_CHARS,DEFAULT_HOTKEY,normalizeHotkey,hotkeyFromEvent,hotkeyProblem,hotkeyLabel,matchesHotkey,GAME_DEFAULT_KEYS,normalizeGameKeys,gameHotkeyConflict,hotkeyIsTyping,KINDS,normalizePlan,filterOperators,updateFilter,toggleSelection,toggleLock,clearUnlocked,selectVisible,examplePlan,addedOperators,candidateOperators,addOperator,removeOperator,toggleDisabled,moveIconOperator,moveItemIcon,MAX_ICON_GRID_CELLS,iconGridSlots,previewIconGrid,moveIconToCell,allOperators,addNamedOperator,MAX_MANUAL_NAME_LENGTH,ITEMS,addItem,addNamedItem,setItemLimit,setItemOwnedTarget,observeItemMatch,setItemEnabled,toggleItemEnabled,setItemAutoUse,setItemEquippedMerge,itemCapReached,setItemMinFunds,setKeepLimit,setKeepMinFunds,removeItem,recordItemPurchase,confirmPurchaseCount,nextItemMatch};
 })();
 // Live catalogue builder ported from the reference extension. No game actions.
 const isId = id => typeof id === 'string' && /^[A-Za-z0-9_:-]{1,80}$/.test(id);
@@ -853,6 +861,82 @@ function changedDeployment(before, after) {
   return sameUnitWithPlacement(before,after) && before.area!==after.area;
 }
 
+
+// Both worlds use the same bounded proof; UID reuse is accepted only for these coin transitions.
+const COIN_NORMAL_ID = 'chess_item_1_03_e_a';
+const COIN_ELITE_ID = 'chess_item_1_03_e_b';
+const coinAuditBench = item => !!item && ['hand','temp'].includes(item.area) && item.carrierUid == null;
+const sameCoinAuditItem = (a,b) => !!a && !!b && a.uid===b.uid && a.id===b.id &&
+  a.area===b.area && (a.carrierUid ?? null)===(b.carrierUid ?? null);
+function coinAuditDiff(before, after) {
+  return {
+    changed: before.items.filter(item => !sameCoinAuditItem(item,after.itemByUid.get(item.uid))),
+    output: after.items.filter(item => !sameCoinAuditItem(item,before.itemByUid.get(item.uid))),
+  };
+}
+
+// The server's active 投资人 state repeats SERVER_GAIN twice, or three times at 100 layers.
+// Both MAIN and the isolated controller derive this from the same private bond fields.
+function gainTraitRepeats(bonds) {
+  if(bonds == null)return 1; // Legacy snapshots did not expose bonds.
+  if(!Array.isArray(bonds))return null;
+  const matches=bonds.filter(bond=>bond?.bondId==='investShip');
+  if(!matches.length)return 1;
+  if(matches.length!==1)return null;
+  const bond=matches[0];
+  if(bond.active===false)return 1;
+  if(bond.active!==true || !Number.isSafeInteger(bond.layers) || bond.layers<0)return null;
+  return bond.layers>=100 ? 3 : 2;
+}
+
+// Prove the exact number of newly granted NORMAL-coin equivalents, including automatic
+// two-normal -> golden merges. Old golden/non-coin items never receive UID exemptions.
+function auditSwireCoinGift(before, after) {
+  const fail=()=>({ok:false,reason:'普通购买产生未知赠装或丢失旧装备；诗怀雅赠币数量、身份或 UID 变化无法核验'});
+  const expected=before.gainRepeats===undefined ? 1 : before.gainRepeats;
+  const nextExpected=after.gainRepeats===undefined ? 1 : after.gainRepeats;
+  if(!Number.isInteger(expected) || expected<1 || expected>3 || nextExpected!==expected)return fail();
+  const {changed,output}=coinAuditDiff(before,after);
+  if(!changed.length && !output.length)
+    return expected===1 ? {ok:true,coin:null,coins:[],changedUids:[]} : fail();
+  if(changed.some(item=>item.id!==COIN_NORMAL_ID || !coinAuditBench(item)) ||
+      output.some(item=>![COIN_NORMAL_ID,COIN_ELITE_ID].includes(item.id) || !coinAuditBench(item)))return fail();
+  const changedUids=new Set(changed.map(item=>item.uid));
+  const normal=output.filter(item=>item.id===COIN_NORMAL_ID),gold=output.filter(item=>item.id===COIN_ELITE_ID);
+  if(normal.length>expected || changed.length>2*gold.length ||
+      normal.length+2*gold.length-changed.length!==expected ||
+      normal.some(item=>before.itemByUid.has(item.uid)) ||
+      gold.some(item=>before.itemByUid.has(item.uid) && !changedUids.has(item.uid)))return fail();
+  const coins=[...gold,...normal].map(item=>({...item,gain:item.id===COIN_ELITE_ID?2:1,
+    merged:item.id===COIN_ELITE_ID,
+    ...(item.id===COIN_ELITE_ID && changed.length===1 ? {mergedFrom:changed[0].uid} : {})}));
+  return {ok:true,coin:coins[0] || null,coins,changedUids:[...changedUids]};
+}
+
+function auditCoinAction(before, after, parent, coin) {
+  const fail=reason=>({ok:false,reason});
+  const original=before?.itemByUid?.get(coin?.uid), target=before?.unitByUid?.get(parent?.uid);
+  if(!before?.ok || !after?.ok || before.identity!==after.identity || !original || original.id!==coin?.id ||
+      ![COIN_NORMAL_ID,COIN_ELITE_ID].includes(original.id) || !coinAuditBench(original) ||
+      !target || target.id!==parent?.id || !Number.isInteger(target.equipped) || target.equipped<0 || target.equipped>=2 ||
+      before.rewardOffer || after.rewardOffer || JSON.stringify(before.slots)!==JSON.stringify(after.slots) ||
+      !Number.isSafeInteger(before.funds) || !Number.isSafeInteger(after.funds))
+    return fail('盟约之币或装备目标、对局、商店状态无法核对');
+  if(before.units.length!==after.units.length || before.units.some(unit=>!sameUnitWithPlacement(unit,after.unitByUid.get(unit.uid))))
+    return fail('盟约之币使用后干员或装备状态出现额外变化');
+  const {changed,output}=coinAuditDiff(before,after);
+  const gain=original.id===COIN_ELITE_ID?2:1;
+  if(after.funds===before.funds+gain && changed.length===1 && changed[0].uid===original.uid && !output.length)
+    return {ok:true,gain,merged:false};
+  // Some compatible equip implementations merge two loose normal coins before applying an effect.
+  // Prove exactly two old coins -> one golden coin, zero funds change, no other inventory change.
+  if(original.id===COIN_NORMAL_ID && after.funds===before.funds && changed.length===2 &&
+      changed.some(item=>item.uid===original.uid) && changed.every(item=>item.id===COIN_NORMAL_ID && coinAuditBench(item)) &&
+      output.length===1 && output[0].id===COIN_ELITE_ID && coinAuditBench(output[0]))
+    return {ok:true,gain:0,merged:true,coin:output[0]};
+  return fail('盟约之币使用后的资金或 UID、库存变化无法核对');
+}
+
 // Only call inside a fully audited buy/sell action, never for idle/manual changes.
 // Normalize one-way refill for surviving, identical old UIDs; the enclosing action audit
 // must still prove EVERY disappearance, new UID, equipment return, and reward.
@@ -902,7 +986,7 @@ function canReverseFullKeep(ctx,base,rule){
     (rule.minFunds==null || Number.isSafeInteger(rule.minFunds) && ctx.funds>rule.minFunds);
 }
 
-// Packaging gifts are retained, never added to the automatic sale ledger.
+// Only audited fresh packaging outputs may enter the automatic sale ledger.
 function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems = null } = {}) {
   const fail = reason => ({ ok:false, reason });
   if (!before?.ok || !after?.ok || before.identity !== after.identity) return fail('卖出期间对局已改变');
@@ -943,7 +1027,7 @@ function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems =
   if(before.units.some(unit=>unit.uid!==uid && after.unitByUid.has(unit.uid) &&
     !sameUnitWithPlacement(unit,after.unitByUid.get(unit.uid))))
     return fail('包装赠员期间旧干员发生未知变化；未自动出售');
-  const consumed=new Set();
+  const consumed=new Set(), packagingMerges=[];
   for(const gift of appeared){
     const rec=chess[gift.id], base=(typeof chess[gift.id]?.baseId==='string' ? chess[gift.id].baseId : gift.id), normal=chess[base];
     const rule=rules.findIndex(r=>r.base===base || r.bonds?.some(bond=>normal?.bonds?.includes(bond)));
@@ -955,7 +1039,9 @@ function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems =
       if(normal.goldenId!==gift.id || need>99)return fail('包装赠员的合成规则无法核验');
       const old=vanished.filter(unit=>!consumed.has(unit.uid) && unit.base===base && !unit.golden);
       if(old.length<need-1)return fail('包装赠员合成所消耗的普通干员无法核验');
-      for(const unit of old.slice(0,need-1))consumed.add(unit.uid);
+      const parents=old.slice(0,need-1);
+      for(const unit of parents)consumed.add(unit.uid);
+      packagingMerges.push({uid:gift.uid,consumedUids:parents.map(unit=>unit.uid)});
     } else if(gift.id!==base)return fail('包装赠员不是可核验的初始同名干员');
   }
   if(vanished.some(unit=>!consumed.has(unit.uid)))return fail('除出售和包装赠员合成外，还有旧 UID 消失；已停止');
@@ -971,7 +1057,24 @@ function auditPackagingSaleSettled(before, after, uid, { chess = {}, gameItems =
   const packagingReward=merged && isPackagingMergeOffer(after.rewardOffer,chess,before.shopLevel);
   const pineconeReward=!merged && sold.id==='chess_char_3_10_a' && isPineconeSaleOffer(after.rewardOffer,chess);
   if(after.rewardOffer && !packagingReward && !pineconeReward)return fail('包装赠员后奖励来源、等阶、候选或队列无法核验；未自动选卡');
-  return {ok:true,packagingGifts:appeared,packagingMerged:merged,packagingReward,pineconeReward};
+  return {ok:true,packagingGifts:appeared,packagingMerged:merged,packagingMerges,packagingReward,pineconeReward};
+}
+
+// A fresh merged UID is NOT proof that its old ingredients were ours to sell.
+// Keep/manual/board protection and unknown old ingredients must propagate to the output.
+function packagingGiftDisposition(audit,before,{keep=[],authorizedUids=[],protectedUids=[]}={}) {
+  const queued=[],kept=[],authorized=new Set(authorizedUids),protectedSet=new Set(protectedUids),bases=new Set(keep);
+  if(audit?.ok!==true || !before?.ok)return {queued,kept};
+  for(const gift of audit.packagingGifts || []){
+    const merged=audit.packagingMerges?.find(entry=>entry.uid===gift.uid);
+    const safeMerge=!gift.golden || merged?.consumedUids?.length>0 && merged.consumedUids.every(uid=>
+      authorized.has(uid) && !protectedSet.has(uid) && before.unitByUid.get(uid)?.equipped===0 &&
+      ['hand','temp'].includes(before.unitByUid.get(uid)?.area));
+    const safe=before.unitByUid.has(gift.uid)===false && ['hand','temp'].includes(gift.area) &&
+      gift.equipped===0 && !bases.has(gift.base) && !protectedSet.has(gift.uid) && safeMerge;
+    (safe ? queued : kept).push(gift);
+  }
+  return {queued,kept};
 }
 
 function isPackagingMergeOffer(offer, chess, shopLevel) {
@@ -1087,27 +1190,18 @@ function auditOrdinaryPurchase(before, after, candidate, {chess={}, retained=fal
   const gained=after.items.filter(item=>!before.itemByUid.has(item.uid));
   const lost=before.items.filter(item=>!after.itemByUid.has(item.uid));
   const bench=item=>!!item && ['hand','temp'].includes(item.area) && item.carrierUid==null;
-  let coin=null, consumedCoin=null;
-  // The one explicit item-gift exception: normal Swire's coin, or its exact bench merge.
-  // Unexpected multi-gifts, equipped-coin merges and elite side effects remain blocked.
-  if(candidate.id==='chess_char_3_03_a' && !merged) {
-    if(gained.length===1 && gained[0].id==='chess_item_1_03_e_a' && bench(gained[0]) && !lost.length)
-      coin={...gained[0],gain:1,merged:false};
-    else if(gained.length===1 && gained[0].id==='chess_item_1_03_e_b' && bench(gained[0]) &&
-      lost.length===1 && lost[0].id==='chess_item_1_03_e_a' && bench(lost[0])) {
-      consumedCoin=lost[0].uid;
-      coin={...gained[0],gain:2,merged:true,mergedFrom:consumedCoin};
-    }
-  }
-  if(gained.length!==(coin ? 1 : 0) || lost.length!==(consumedCoin!==null ? 1 : 0))
-    return fail('普通购买产生未知赠装或丢失旧装备；未授权出售');
+  const gift=candidate.id==='chess_char_3_03_a' && !merged ? auditSwireCoinGift(before,after) : null;
+  if(gift ? !gift.ok : gained.length>0 || lost.length>0)
+    return fail(gift?.reason || '普通购买产生未知赠装或丢失旧装备；未授权出售');
+  const coin=gift?.coin || null, changedCoins=new Set(gift?.changedUids || []);
   if(before.items.some(item=>{
-    if(item.uid===consumedCoin)return false;
+    if(changedCoins.has(item.uid))return false;
     const next=after.itemByUid.get(item.uid);
     return !next || next.id!==item.id || (consumed.has(item.carrierUid) ? !bench(next) :
       next.area!==item.area || (next.carrierUid ?? null)!==(item.carrierUid ?? null));
   }))return fail('普通购买期间旧装备迁移或合成返装无法核验');
-  return {ok:true,parent,merged,mergedKeepReward:merged,consumedUids:[...consumed],coin};
+  return {ok:true,parent,merged,mergedKeepReward:merged,consumedUids:[...consumed],coin,
+    coins:gift?.coins || [],coinConsumedUids:gift?.changedUids || []};
 }
 
 // The stamp remains exact except for independently allowed hand/board placement of OTHER units.
@@ -1294,6 +1388,7 @@ function inspectMatch(state, chess, { allowReward = false } = {}) {
   if (!inventory.ok) return inventory;
   return { ...inventory, identity: `${room.code}|${me}|${pub.round}`,
     funds: priv.funds, slots: priv.shop.slots, refreshPrice: priv.shop.refreshPrice, shopLevel:priv.shop.level,
+    gainRepeats:gainTraitRepeats(priv.bonds),
     rewardOffer: Array.isArray(rewardOffer?.slots) && rewardOffer.slots.length ? rewardOffer : null };
 }
 
@@ -1468,22 +1563,7 @@ function auditReward(before, after, chosen) {
 }
 
 function auditCoinUse(before, after, parent, coin) {
-  const fail = reason => ({ ok: false, reason });
-  const gain = coin?.id === SWIRE_COIN_GOLDEN_ID ? 2 : 1;
-  if (!before?.ok || !after?.ok || before.identity !== after.identity ||
-      after.funds !== before.funds + gain ||
-      (coin.id !== SWIRE_COIN_ID && coin.id !== SWIRE_COIN_GOLDEN_ID) ||
-      after.itemByUid.has(coin.uid) || after.unitByUid.get(parent.uid)?.id !== parent.id) {
-    return fail('盟约之币使用后的资金或 UID 无法核对');
-  }
-  if (before.units.length !== after.units.length ||
-      before.units.some(x => after.unitByUid.get(x.uid)?.id !== x.id) ||
-      after.items.length !== before.items.length - 1 ||
-      before.items.some(x => x.uid !== coin.uid &&
-        (after.itemByUid.get(x.uid)?.id !== x.id || after.itemByUid.get(x.uid)?.carrierUid !== x.carrierUid))) {
-    return fail('盟约之币使用后库存出现额外变化');
-  }
-  return { ok: true, gain };
+  return auditCoinAction(before, after, parent, coin);
 }
 
 /** Every normal/golden 盟约之币 sitting in hand or temp, normal coins first. */
@@ -1548,8 +1628,9 @@ function itemMergeRule(id, lookup) {
 }
 
 // User choice: buying may merge with identical copies lying in hand/temp, but never with
-// equipment already issued to an operator. The server consumes temp copies, then hand, then equipped.
-function planItemMerge(ctx, id, rule) {
+// issued equipment, except the dedicated opt-in for ordinary commercial packaging.
+// The server consumes temp copies, then hand, then equipped.
+function planItemMerge(ctx, id, rule, permission = {}) {
   const copies = (ctx?.items || []).filter(item => item.id === id);
   if (rule === null || rule === undefined) {
     return copies.length ? { ok: false, reason: '游戏道具数据缺少合成规则，已持有同名道具时不自动买入' }
@@ -1558,9 +1639,16 @@ function planItemMerge(ctx, id, rule) {
   if (rule.mergeable !== true || copies.length + 1 < rule.need) return { ok: true, merge: null };
   if (copies.length + 1 > rule.need) return { ok: false, reason: '同名道具数量已达合成数却未合成，状态无法确认' };
   const bench = [...copies.filter(item => item.area === 'temp'), ...copies.filter(item => item.area === 'hand')];
-  if (bench.length < rule.need - 1) return { ok: false, reason: '买入会与干员身上已配发的同名装备合成，已跳过' };
+  const authorized=id==='chess_item_5_07_e_a' && permission.allowEquippedMerge===true &&
+    rule.need===2 && rule.goldenId==='chess_item_5_07_e_b';
+  if (bench.length < rule.need - 1 && !authorized) return { ok: false, reason: '买入会与干员身上已配发的同名装备合成，已跳过' };
+  const consumed=[...bench,...(authorized?copies.filter(item=>item.area==='equipped'):[])].slice(0,rule.need-1);
+  if(consumed.length!==rule.need-1)return {ok:false,reason:'道具合成材料区域无法核对'};
+  const equipped=consumed.filter(item=>item.area==='equipped').map(item=>({uid:item.uid,carrierUid:item.carrierUid}));
+  if(equipped.some(item=>!Number.isInteger(item.carrierUid)||!ctx.unitByUid?.has(item.carrierUid)))
+    return {ok:false,reason:'包装已装备材料的携带者无法核对'};
   return { ok: true, merge: { need: rule.need, goldenId: rule.goldenId,
-    consumed: bench.slice(0, rule.need - 1).map(item => item.uid) } };
+    consumed: consumed.map(item => item.uid),...(equipped.length?{equipped}: {}) } };
 }
 
 function itemHoldingAllows(items, rule) {
@@ -1582,10 +1670,10 @@ function pickItemCandidate(ctx, plan) {
         !Number.isInteger(rule.used) || rule.used < 0 || rule.used >= (rule.limit ?? 9999) ||
         rule.minFunds !== null && ctx.funds <= rule.minFunds) continue;
     if (!itemHoldingAllows(ctx.items, rule)) continue;
-    const merging = planItemMerge(ctx, offer.id, rule.merge);
+    const merging = planItemMerge(ctx, offer.id, rule.merge, rule);
     if (!merging.ok) continue; // e.g. would consume issued equipment: skip, do not stop the run.
     return {slot, id:offer.id, price:offer.price, sourceId:rule.sourceId, name:rule.name,
-      ...(merging.merge ? { merge: merging.merge } : {})};
+      ...(merging.merge ? { merge: merging.merge, ...(merging.merge.equipped?.length?{allowEquippedMerge:true}: {}) } : {})};
   }
   return null;
 }
@@ -1604,17 +1692,26 @@ function auditItemPurchase(before, after, chosen) {
        offer?.price !== after.slots[index]?.price || offer?.sold !== after.slots[index]?.sold))) {
     return fail('道具购买时其他商店槽发生变化');
   }
-  if (before.units.length !== after.units.length || before.units.some(unit => {
-    const found = after.unitByUid.get(unit.uid);
-    return !sameUnitWithPlacement(unit,found);
-  })) return fail('道具购买时干员 UID 或装备发生变化');
   const merge = chosen.merge || null, consumed = new Set(merge ? merge.consumed : []);
   if (merge && (!Array.isArray(merge.consumed) || consumed.size !== merge.need - 1 ||
       typeof merge.goldenId !== 'string')) return fail('道具合成预期不完整');
+  const issued=before.items.filter(item=>consumed.has(item.uid)&&item.area==='equipped');
+  const authorized=chosen.id==='chess_item_5_07_e_a'&&chosen.allowEquippedMerge===true&&
+    merge?.need===2&&merge.goldenId==='chess_item_5_07_e_b';
+  const equipped=issued.map(item=>({uid:item.uid,carrierUid:item.carrierUid}));
+  if(issued.length&&!authorized || JSON.stringify(merge?.equipped || [])!==JSON.stringify(equipped))
+    return fail('已装备包装合成缺少专属授权或材料/携带者证明不一致');
+  if(issued.some(item=>!Number.isInteger(item.carrierUid)||!before.unitByUid.has(item.carrierUid)))
+    return fail('已装备包装的携带者无法核对');
   if (merge && [...consumed].some(uid => {
     const old = before.itemByUid.get(uid);
-    return !old || old.id !== chosen.id || (old.area !== 'hand' && old.area !== 'temp') || after.itemByUid.has(uid);
+    return !old || old.id !== chosen.id || (old.area !== 'hand' && old.area !== 'temp' && !(authorized&&old.area==='equipped')) || after.itemByUid.has(uid);
   })) return fail('道具合成消耗的旧 UID 与预期不符');
+  if (before.units.length !== after.units.length || before.units.some(unit => {
+    const removed=issued.filter(item=>item.carrierUid===unit.uid).length;
+    const expected=removed?{...unit,equipped:unit.equipped-removed}:unit;
+    return !Number.isInteger(expected.equipped)||expected.equipped<0||!sameUnitWithPlacement(expected,after.unitByUid.get(unit.uid));
+  })) return fail('道具购买时干员 UID 或未授权装备发生变化');
   if (before.items.some(item => {
     if (consumed.has(item.uid)) return false;
     const found = after.itemByUid.get(item.uid);
@@ -2055,7 +2152,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       return false;
     }
     if (!still || still.id !== candidate.id || still.slot !== candidate.slot) return true;
-    const mergeNote = candidate.merge ? '（将与手牌/整备区同名道具合成精锐）' : '';
+    const mergeNote = candidate.merge?.equipped?.length ? '（已明确授权：消耗已装备普通包装合成精锐）' : candidate.merge ? '（将与手牌/整备区同名道具合成精锐）' : '';
     report('working', `正在买入道具 ${name}${mergeNote} · 实价 ${candidate.price}`);
     let receipt,uid;
     try { receipt = await buyItem(candidate.slot, { id:candidate.id, price:candidate.price, merge:candidate.merge || null,planStamp:JSON.stringify(getPlan()) }); }
@@ -2077,6 +2174,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     if (!checked.ok || checked.item.uid !== uid) {
       stop(`道具 ${name}：${checked.reason || '主世界与工作台核对的 UID 不同'}；不重试，请人工核对次数`); return false;
     }
+    for(const part of candidate.merge?.equipped || []){settingsProtected.add(part.carrierUid);placementProtected.add(part.carrierUid);}
     totals.bought++;
     let counted;
     try { counted=await onRecordPurchase({kind:'item',sourceId:receipt?.sourceId || candidate.sourceId,realId:candidate.id,uid,epoch:receipt?.epoch ?? getPlan().epoch}); }
@@ -2146,7 +2244,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
     const pushed = await waitFor(state => {
       const snap = inspectMatch(state, chess);
       return snap.ok && snap.identity === identity &&
-        (!snap.itemByUid.has(coin.uid) || snap.funds !== ready.funds);
+        (snap.itemByUid.get(coin.uid)?.id !== coin.id || snap.funds !== ready.funds || snap.items.length !== ready.items.length);
     });
     if (!running || mine !== generation) return null;
     if (!pushed) {
@@ -2166,7 +2264,9 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       return latest;
     }
     try {
-      await writeAudit('coin_ok', `盟约之币已核对 · UID ${coin.uid} · 资金 +${checked.gain}`,
+      await writeAudit('coin_ok', checked.merged
+        ? `盟约之币合并已核对 · UID ${coin.uid} → 金币 UID ${checked.coin.uid}，继续使用金币`
+        : `盟约之币已核对 · UID ${coin.uid} · 资金 +${checked.gain}`,
         { itemUid: coin.uid, targetUid: target.uid, amount: checked.gain });
     } catch (error) { stop(`赠币使用后日志保存失败：${error?.message || '存储不可用'}；停止后续交易`); return null; }
     return running && mine === generation ? used : null;
@@ -2330,7 +2430,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
 
   async function freeFlametailRewardSpace(before,audit,keep,mine) {
     let current=before;
-    const soldEarly=new Set(), candidates=[...audit.gifts,audit.parent], gifts=new Set(audit.gifts.map(u=>u.uid));
+    const soldEarly=new Set(), candidates=[...audit.gifts,audit.parent], gifts=new Set(audit.gifts.map(u=>u.uid)), packagingGifts=[];
     const expectedOffer=mergeOfferStamp(before.rewardOffer);
     function retain(snap,unit){
       const plan=getPlan(), protectedBases=new Set([...keep,...transactionKeeps,...keepBases(plan,chess)]);
@@ -2343,7 +2443,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       const placement=auditOverflowPlacement(current,latest,chess);
       if(!placement.ok){stop(placement.reason);return null;}
       current=latest;
-      if(current.hand.some(piece=>!piece) || current.hand.length<10)return {after:current,soldEarly};
+      if(current.hand.some(piece=>!piece) || current.hand.length<10)return {after:current,soldEarly,packagingGifts};
       const unit=candidates.find(u=>{
         const now=current.unitByUid.get(u.uid);
         return !soldEarly.has(u.uid) && now && now.id===u.id && ['hand','temp'].includes(now.area) &&
@@ -2394,7 +2494,13 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       const audited=auditPendingMergeSale(current,after,unit.uid,{chess,gameItems});
       if(!audited.ok){stop(audited.reason);return null;}
       soldEarly.add(unit.uid);totals.sold++;
-      if(audited.packagingGifts?.length)totals.kept+=audited.packagingGifts.length;
+      if(audited.packagingGifts?.length){
+        const disposition=packagingGiftDisposition(audited,current,{keep:[...keep,...transactionKeeps,...keepBases(getPlan(),chess)],
+          authorizedUids:candidates.map(u=>u.uid),protectedUids:[...settingsProtected,...placementProtected]});
+        for(const gift of disposition.kept)settingsProtected.add(gift.uid);
+        packagingGifts.push(...audited.packagingGifts);candidates.push(...audited.packagingGifts);
+        if(packagingGifts.length>128){stop('包装赠员连续产生超出单次安全上限，已停止；剩余新UID未继续出售');return null;}
+      }
       try{await writeAudit('sell_ok',`爆仓腾位已核对 · UID ${unit.uid}，原晋升奖励保持未领取`,
         {uid:unit.uid,operatorId:unit.id,refilledUids:audited.refilledUids,packagingGiftUids:audited.packagingGifts?.map(u=>u.uid)});}
       catch(error){stop(`腾位已完成但日志无法保存：${error?.message || '存储不可用'}`);return null;}
@@ -2594,11 +2700,11 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       } catch (error) { stop(`买入已完成但核对日志未保存：${error?.message || '存储不可用'}；不会自动出售`); return; }
       if (!running || mine !== generation) return;
       let current=after, promotion=null;
-      let soldEarly=new Set();
+      let soldEarly=new Set(), overflowPackaging=[];
       if(audit.mergedGift && current.hand.length>=10 && current.hand.every(Boolean)){
         const drained=await freeFlametailRewardSpace(current,audit,keep,mine);
         if(!drained)return;
-        current=drained.after;soldEarly=drained.soldEarly;
+        current=drained.after;soldEarly=drained.soldEarly;overflowPackaging=drained.packagingGifts;
       }
       if(audit.mergedGift || audit.mergedKeepReward){
         promotion=audit.mergedKeepReward ? await takeStrictMergeReward(current,mine,'keep') :
@@ -2611,14 +2717,14 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
       if(audit.mergedKeepReward)keep.add(audit.parent.base);
       if(audit.coin){
         current=await useOneCoin(current,audit.coin,[audit.parent.uid],mine,
-          audit.coin.merged ? '诗怀雅赠币与旧币合成出的金币' : '本次诗怀雅赠送的盟约之币');
+          audit.coin.merged ? '诗怀雅赠币合成出的金币' : '本次诗怀雅赠送的盟约之币');
         if(!current)return;
       }
       current=await drainCoins(current,mine);
       if(!current)return;
       // Gift first, then the verified promotion card, then the source Flametail;
       // a later Pinecone reward can be spliced into this same protected queue.
-      const saleQueue = [...audit.gifts, ...(promotion ? [promotion.unit] : []), audit.parent]
+      const saleQueue = [...audit.gifts, ...overflowPackaging, ...(promotion ? [promotion.unit] : []), audit.parent]
         .filter(unit=>!soldEarly.has(unit.uid) && current.unitByUid.has(unit.uid));
       const quotaGifts=new Set(candidate.id===FLAMETAIL_ID ?
         [...audit.gifts.map(gift=>gift.uid),...(promotion ? [promotion.unit.uid] : [])] : []);
@@ -2658,7 +2764,7 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
           current = latest;
           continue;
         }
-        // Last-second guard: only a fresh UID approved by a purchase/reward audit may reach sell().
+        // Last-second guard: only a fresh UID approved by purchase/reward/packaging audits may reach sell().
         const unitName = chess[unit.id]?.name || unit.id;
         try { await writeAudit('sell_request', `准备出售本轮授权 ${unitName} · UID ${unit.uid}`,
           { operatorId: unit.id, uid: unit.uid }); }
@@ -2715,13 +2821,17 @@ function createAutoController({ read, subscribe, buy, buyItem, sell, refresh, us
         packagingPending=saleAudit.packagingReward===true;packagingSalePending=false;
         if(next.rewardOffer && !packagingPending && !pineconePending){stop('出售后奖励来源未核验');return;}
         if(saleAudit.packagingGifts?.length){
-          // A server-created gift/merge is not one of our purchased UIDs: never put it in saleQueue.
-          totals.kept+=saleAudit.packagingGifts.length;
-          try { await writeAudit('keep','商业包装方案赠员已核对并保留，不自动出售',
-            {giftUids:saleAudit.packagingGifts.map(gift=>gift.uid),merged:saleAudit.packagingMerged}); }
+          const disposition=packagingGiftDisposition(saleAudit,latest,{keep:[...keep,...transactionKeeps,...keepBases(getPlan(),chess)],
+            authorizedUids:saleQueue.map(u=>u.uid),protectedUids:[...settingsProtected,...placementProtected]});
+          for(const gift of disposition.kept)settingsProtected.add(gift.uid);
+          try { await writeAudit('gift','商业包装方案赠员来源已核对：名单外进入出售队列，保留/部署及旧卡合成保护优先',
+            {giftUids:saleAudit.packagingGifts.map(gift=>gift.uid),saleUids:disposition.queued.map(gift=>gift.uid),
+              protectedUids:disposition.kept.map(gift=>gift.uid),merged:saleAudit.packagingMerged}); }
           catch(error){stop(`包装赠员日志保存失败：${error.message}`);return;}
-          // A proven packaging merge can consume a future queue member. Its old UID must not be sold.
+          // Drop consumed old queue UIDs before adding their audited outputs. Never guess/reuse an old UID.
           for(let j=saleQueue.length-1;j>i;j--)if(!next.unitByUid.has(saleQueue[j].uid))saleQueue.splice(j,1);
+          saleQueue.splice(i+1,0,...saleAudit.packagingGifts);
+          if(saleQueue.length>256){stop('包装赠员连续产生超出单次安全上限，已停止；剩余新UID未继续出售');return;}
         }
         totals.sold++;
         try { await writeAudit('sell_ok', `出售已核对 ${unitName} · UID ${unit.uid}`,
@@ -3072,30 +3182,16 @@ function createSpuiTransport(config, getPlan, chess={}) {
           priv.hand?.length >= 10 && priv.hand.every(Boolean)) {
         throw new Error('道具槽位、次数、资金门槛或手牌区在买入前已变化');
       }
-      // Every identical copy counts toward a merge, including equipment issued to an operator.
-      const bench = [...(priv.hand || []), ...(priv.temp || [])].filter(item => item?.kind === 'item' && item.id === offer.id);
-      const issued = (priv.board || []).concat(priv.hand || [], priv.temp || [])
-        .flatMap(piece => piece?.kind === 'chess' && Array.isArray(piece.items) ? piece.items : [])
-        .filter(item => item?.id === offer.id);
-      const holdings = [...(priv.hand || []), ...(priv.temp || []), ...(priv.board || [])].filter(piece => piece?.kind === 'item')
-        .concat((priv.board || []).concat(priv.hand || [], priv.temp || []).flatMap(piece =>
-          piece?.kind === 'chess' && Array.isArray(piece.items) ? piece.items.map(item => ({ ...item, area: 'equipped' })) : []));
-      if (!itemHoldingAllows(holdings,rule)) throw new Error('道具实时持有目标已达到或库存无法核对');
-      const merge = expected.merge || null;
-      if (merge) {
-        const consumed = Array.isArray(merge.consumed) ? merge.consumed : [];
-        if (typeof merge.goldenId !== 'string' || !Number.isInteger(merge.need) || consumed.length !== merge.need - 1 ||
-            issued.length || bench.length !== consumed.length ||
-            consumed.some(uid => !bench.some(item => item.uid === uid))) {
-          throw new Error('道具合成所需的同名旧件已变化，或会消耗已配发装备；不会自动买入');
-        }
-      } else if (bench.length + issued.length > 0 && rule.merge?.mergeable !== false &&
-                 !(rule.merge?.mergeable === true && bench.length + issued.length + 1 < rule.merge.need)) {
-        throw new Error('已持有同名道具且合成结果无法确认；不会自动买入');
-      }
+      const inventory=inspectInventory(priv,chess);
+      if(!inventory.ok || !itemHoldingAllows(inventory.items,rule))throw new Error('道具实时持有目标已达到或库存无法核对');
+      const planned=planItemMerge(inventory,offer.id,rule.merge,rule);
+      if(!planned.ok)throw new Error(planned.reason);
+      const merge=planned.merge;
+      if(JSON.stringify(expected.merge || null)!==JSON.stringify(merge))
+        throw new Error('道具合成材料、携带者或授权在下单前已变化；不会自动买入');
       const response = await ask('buy-item', {slot,expectedId:expected.id,expectedPrice:expected.price,
-        itemRule:{id:rule.id,enabled:true,limit:rule.limit,used:rule.used,minFunds:rule.minFunds,ownedTarget:rule.ownedTarget},
-        expectMerge: merge ? {goldenId:merge.goldenId,consumed:[...merge.consumed]} : null});
+        itemRule:{id:rule.id,enabled:true,limit:rule.limit,used:rule.used,minFunds:rule.minFunds,ownedTarget:rule.ownedTarget,allowEquippedMerge:rule.allowEquippedMerge===true},
+        expectMerge: merge ? {...merge,consumed:[...merge.consumed]} : null});
       if (!Number.isInteger(response.result?.itemUid) || response.result.itemUid < 0) {
         throw new Error('道具买入已发送但未收到可信 UID；不会自动重试');
       }
@@ -3244,7 +3340,7 @@ function createAuditLog({ sendMessage, origin, clientVersion, onChange = () => {
     if (response?.ok !== true || !Array.isArray(response.entries)) {
       throw new Error(response?.reason || '日志服务未返回有效数据');
     }
-    entries = response.entries.slice(-300);
+    entries = response.entries.slice(-1000);
     notify();
     return entries.slice();
   }
@@ -3437,6 +3533,7 @@ function resolveGamePlan(raw, chess, bonds = {}, gameItems = null, diy = null) {
     const record = itemIndex.records.get(real), base = record?.baseId || real;
     const targetIds = [...new Set([real, base, ...[record,itemIndex.records.get(base)].map(r => r?.goldenId || r?.upgradeChessId).filter(id => typeof id === 'string')])];
     effective.items.push({ id: real, sourceId: item.id, name, limit: item.limit,
+      allowEquippedMerge:real==='chess_item_5_07_e_a' && item.allowEquippedMerge===true,
       ownedTarget: item.ownedTarget ?? null, targetIds, excludeEquipped: real === 'chess_item_6_08_e_a',
       used: stored.itemSession.used[item.id] || 0, minFunds: item.minFunds, merge });
   }
@@ -3448,7 +3545,7 @@ function tradePlanKey(raw) {
   // Confirmed purchase counters are not configuration edits. Manual or detected
   // next matches advance epoch and stop a live run before resetting counters.
   return JSON.stringify({buy:p.buy,keep:p.keep,disabled:p.disabled,customOperators:p.customOperators,
-    itemBuyingPaused:p.itemBuyingPaused===true,keepRules:p.keepRules,items:p.items.filter(item=>item.enabled).map(({id,limit,minFunds,ownedTarget})=>({id,limit,minFunds,ownedTarget})),
+    itemBuyingPaused:p.itemBuyingPaused===true,keepRules:p.keepRules,items:p.items.filter(item=>item.enabled).map(({id,limit,minFunds,ownedTarget,allowEquippedMerge})=>({id,limit,minFunds,ownedTarget,allowEquippedMerge})),
     autoUse:p.items.filter(item=>item.autoUse===true).map(item=>item.id),
     epoch:p.itemSession.epoch});
 }

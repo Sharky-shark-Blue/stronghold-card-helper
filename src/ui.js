@@ -176,12 +176,12 @@ export async function mountWorkbench(container, options) {
         <p id="draft-note">自动交易未启动。</p><p class="auto-risk">买入、刷新无总额上限 · 刷新间隔 ≥0.3秒</p>
       </section>
       <div class="feedback-slot" data-feedback-slot="main"><div class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div></div>
-      <div class="utility-bar"><button class="utility-button" type="button" data-action="open-log">执行日志 <span id="log-count">0 / 300</span></button><button class="utility-button" type="button" data-action="open-health">运行自检 <span id="health-label">未连接</span></button></div>
+      <div class="utility-bar"><button class="utility-button" type="button" data-action="open-log">执行日志 <span id="log-count">0 / 1000</span></button><button class="utility-button" type="button" data-action="open-health">运行自检 <span id="health-label">未连接</span></button></div>
       <div class="save-status" data-state="saved" role="status" aria-live="polite"><span class="save-dot"></span><span id="save-label">${options.preview ? '示例数据 · 离线预览' : '已保存到本地'}</span><span class="version">${esc(version ? `v${version}` : '版本未知')}</span></div>
     </footer>
     <div id="entry-menu" class="action-menu" role="menu" aria-label="干员操作" hidden><strong id="entry-menu-name"></strong><p>锁定项需先解锁，才能移除。</p><button class="row-remove" type="button" data-action="remove" role="menuitem">${icon('close')}从当前名单移除</button></div>
     <div id="bulk-menu" class="action-menu bulk-menu" role="menu" aria-label="名单操作" hidden><strong>当前名单</strong><p>只清空未锁定项；不会影响另一份名单。</p><button class="danger-button" type="button" data-action="clear" role="menuitem">清空未锁定项</button><span id="clear-hint">点击后需要再次确认</span></div>
-    <div class="utility-backdrop" hidden><section class="utility-sheet" role="dialog" aria-modal="true" aria-labelledby="utility-title"><header class="utility-head"><button class="tool-button" type="button" data-action="utility-close">← 返回名单</button><h2 id="utility-title">执行日志</h2><button class="icon-button" type="button" data-action="utility-close" aria-label="关闭辅助工具">${icon('close')}</button></header><div id="log-view" class="utility-content"><div class="log-actions"><button class="tool-button" type="button" data-action="log-read">刷新日志</button><button class="tool-button" type="button" data-action="log-export">导出 JSON</button><button class="tool-button danger-button" type="button" data-action="log-clear">清空此服</button></div><p class="sheet-hint">仅显示当前服务器最近 60 条；本地最多保留 300 条。</p><ol id="log-list" class="log-list"></ol></div><div id="health-view" class="utility-content" hidden><p class="sheet-hint">只检查接口和名单匹配，不会启动交易。</p><div id="health-list" class="health-list"></div><button class="new-button" type="button" data-action="health-check">重新检查</button></div><footer class="utility-foot"><div class="feedback-slot" data-feedback-slot="utility"><span data-feedback-default>查看工具不会自动开始买卖</span></div><button class="run-button" type="button" role="switch" data-action="draft" aria-checked="false" aria-label="手动启动或停止自动倒转"><span class="run-label">启动</span></button></footer></section></div>
+    <div class="utility-backdrop" hidden><section class="utility-sheet" role="dialog" aria-modal="true" aria-labelledby="utility-title"><header class="utility-head"><button class="tool-button" type="button" data-action="utility-close">← 返回名单</button><h2 id="utility-title">执行日志</h2><button class="icon-button" type="button" data-action="utility-close" aria-label="关闭辅助工具">${icon('close')}</button></header><div id="log-view" class="utility-content"><div class="log-actions"><button class="tool-button" type="button" data-action="log-read">刷新日志</button><button class="tool-button" type="button" data-action="log-export">导出 JSON</button><button class="tool-button danger-button" type="button" data-action="log-clear">清空此服</button></div><p class="sheet-hint">仅显示当前服务器最近 60 条；本地最多保留 1000 条。</p><ol id="log-list" class="log-list"></ol></div><div id="health-view" class="utility-content" hidden><p class="sheet-hint">只检查接口和名单匹配，不会启动交易。</p><div id="health-list" class="health-list"></div><button class="new-button" type="button" data-action="health-check">重新检查</button></div><footer class="utility-foot"><div class="feedback-slot" data-feedback-slot="utility"><span data-feedback-default>查看工具不会自动开始买卖</span></div><button class="run-button" type="button" role="switch" data-action="draft" aria-checked="false" aria-label="手动启动或停止自动倒转"><span class="run-label">启动</span></button></footer></section></div>
     <div class="settings-backdrop" hidden>
       <section class="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div class="settings-head"><h2 id="settings-title">工作台设置</h2><button class="icon-button" type="button" data-action="settings-close" aria-label="关闭设置">${icon('close')}</button></div>
@@ -199,7 +199,7 @@ export async function mountWorkbench(container, options) {
           <div class="hotkey-controls"><button class="hotkey-button" type="button" data-action="hotkey-record" aria-pressed="false" aria-labelledby="hotkey-title" aria-describedby="hotkey-hint"><kbd id="hotkey-label">F8</kbd><span>点击修改</span></button><button class="text-button" type="button" data-action="hotkey-reset">恢复 F8</button><button class="text-button subtle" type="button" data-action="hotkey-off">关闭</button></div>
           <p id="hotkey-error" class="hotkey-error" role="alert" hidden></p></div>
         <div class="settings-group config-group"><div class="config-text"><label>配置文件</label><p>名单、规则与界面设置自动保存。运行中可修改。</p></div>
-          <div class="config-actions"><button class="tool-button" type="button" data-action="config-export">${icon('buy')}导出配置</button><button class="tool-button" type="button" data-action="config-import">${icon('upload')}导入配置</button><input id="config-file" type="file" accept=".json,application/json" hidden></div>
+          <div class="config-actions"><button class="tool-button" type="button" data-action="config-export">${icon('buy')}导出配置</button><label class="tool-button config-import-trigger" data-action="config-import">${icon('upload')}<span>导入配置</span><input id="config-file" type="file" accept=".json,application/json" aria-label="导入配置 JSON 文件"></label></div>
           <p class="config-hint">导入会覆盖配置，保留本局计数；覆盖前自动备份。</p>
           <button class="text-button config-restore" type="button" data-action="config-restore" hidden>恢复导入前的配置</button>
           <p id="config-error" class="hotkey-error" role="alert" hidden></p></div>
@@ -293,7 +293,7 @@ export async function mountWorkbench(container, options) {
     note.hidden = !pending.length;
     note.textContent = pending.length ? `待识别 ${pending.length} 项 · 仅这些条目暂不下单，其他规则继续（详情见运行自检）` : '';
     note.title = pending.map(entry=>`${entry.name}：${entry.reason}`).join('\n');
-    $('#log-count').textContent = `${runtimeInfo.logCount || 0} / 300`;
+    $('#log-count').textContent = `${runtimeInfo.logCount || 0} / 1000`;
     $('#log-list').innerHTML = (runtimeInfo.entries || []).slice(-60).reverse().map(entry => `<li class="log-entry" data-level="${esc(entry.level)}"><time>${esc(new Date(entry.at).toLocaleTimeString('zh-CN',{hour12:false}))}</time><span>${esc(entry.summary)}</span></li>`).join('') || '<li class="log-empty">此服务器暂无执行日志。</li>';
   }
   function manualHint(op) { const pending=runtimeInfo.pending?.find(entry=>entry.id===op.id&&entry.kind===plan.active);if(pending)return `待识别 · ${pending.reason}`;const id=runtimeInfo.matches?.[op.id];return id ? `手动条目 · 本服已匹配 ${id}` : '自定义条目 · 待本服匹配'; }
@@ -450,6 +450,7 @@ export async function mountWorkbench(container, options) {
         <div class="item-stepper"><button type="button" data-action="item-minus" data-id="${esc(item.id)}" aria-label="减少 ${esc(name)} 本局已抓次数" ${used <= 0 ? 'disabled' : ''}>−</button><span>已抓 ${used}${item.limit != null ? ` / ${item.limit}` : ''}</span><button type="button" data-action="item-plus" data-id="${esc(item.id)}" aria-label="增加 ${esc(name)} 本局已抓次数" ${used >= (item.limit ?? 9999) ? 'disabled' : ''}>＋</button></div>
         <label class="item-funds-label">购买前资金 ＞ <input type="number" min="0" max="999999999" step="1" value="${item.minFunds??''}" placeholder="不限" data-item-funds="${esc(item.id)}" aria-label="${esc(name)} 购买前资金必须大于"></label>
         <label class="item-use-label${item.autoUse ? ' is-on' : ''}" title="运行中把手牌/整备区的该道具装备给最近获得的干员（战场优先，其次手牌区）；装备栏满则换下一名，绝不替换已佩戴装备。仅对装备即消耗的道具生效。"><input type="checkbox" data-item-use="${esc(item.id)}" ${item.autoUse ? 'checked' : ''} aria-label="${esc(name)} 自动使用：装备给最近获得的干员"> 自动使用 · 给最近干员</label>
+        ${item.id==='chess_item_5_07_e_a'?`<label class="item-use-label${item.allowEquippedMerge?' is-on':''}" title="仅商业包装：允许买入时消耗已装备的普通包装来合成精锐，可能改变装备状态；不会自动装备合成产物，也不放宽其他装备保护。"><input type="checkbox" data-item-equipped-merge="${esc(item.id)}" ${item.allowEquippedMerge?'checked':''}> 允许已装备包装参与合成</label>`:''}
         ${item.autoUse && useNote ? `<span class="item-use-note">${esc(useNote)}</span>` : ''}
       </div>`;
     };
@@ -885,6 +886,9 @@ export async function mountWorkbench(container, options) {
       result=Model.setItemAutoUse(plan,id,input.checked);
       if(result.changed){const name=Model.ITEMS.find(entry=>entry.id===id)?.name||item.name||id;
         toast(input.checked?`「${name}」开启自动使用：运行中会装备给最近获得的干员（战场优先，装备栏满则跳过）。${USE_WARNINGS[id]?' '+USE_WARNINGS[id]:''}`:`「${name}」已关闭自动使用。`);}
+    } else if(input.matches('[data-item-equipped-merge]')) {
+      result=Model.setItemEquippedMerge(plan,input.dataset.itemEquippedMerge,input.checked);
+      if(result.changed)toast(input.checked?'已授权：仅商业包装买入可消耗已装备普通件合成；其他装备仍受保护。交易仍须手动启动。':'已恢复保护：不再自动消耗已装备的普通包装。');
     } else if(input.matches('[data-item-target]')) {
       const previous=plan.items.find(item=>item.id===input.dataset.itemTarget);if(!previous)return;
       const value=optional(input.value,99);
@@ -1131,7 +1135,6 @@ export async function mountWorkbench(container, options) {
       case 'items-master-toggle': toggleAllItemBuying(); break;
       case 'item-quick-toggle': quickToggleItem(id); break;
       case 'config-export': exportConfigFile(); break;
-      case 'config-import': configError(''); configFile.value = ''; configFile.click(); break;
       case 'config-restore': void restoreBackup(); break;
       case 'item-picker-open': openItemPicker(); break;
       case 'item-picker-close': modal(null); break;
@@ -1261,6 +1264,9 @@ export async function mountWorkbench(container, options) {
   root.addEventListener('lostpointercapture', iconPointerCancel);
   pickerSearch.addEventListener('input', pickerInput); pickerBond.addEventListener('change', pickerSelect);
   itemPickerSearch.addEventListener('input', itemPickerInput); itemSearch.addEventListener('input', itemSearchInput);
+  // Keep the native file input as the real pointer/keyboard target. No scripted hidden-input relay.
+  const configFileClick = () => {configError('');configFile.value='';};
+  configFile.addEventListener('click',configFileClick);
   const configFileChange = () => { const file = configFile.files?.[0]; configFile.value = ''; void importConfigFile(file); };
   configFile.addEventListener('change', configFileChange);
   manualForm.addEventListener('submit', submitManual); manualName.addEventListener('input', manualInput);
@@ -1344,7 +1350,7 @@ export async function mountWorkbench(container, options) {
       root.removeEventListener('lostpointercapture', iconPointerCancel);
       search.removeEventListener('input', input); bond.removeEventListener('change', selectBond);
       pickerSearch.removeEventListener('input', pickerInput); pickerBond.removeEventListener('change', pickerSelect);
-      itemPickerSearch.removeEventListener('input', itemPickerInput); itemSearch.removeEventListener('input', itemSearchInput); configFile.removeEventListener('change', configFileChange);
+      itemPickerSearch.removeEventListener('input', itemPickerInput); itemSearch.removeEventListener('input', itemSearchInput); configFile.removeEventListener('change', configFileChange); configFile.removeEventListener('click',configFileClick);
       manualForm.removeEventListener('submit', submitManual); manualName.removeEventListener('input', manualInput);
       itemManualForm.removeEventListener('submit',submitItemManual);itemManualName.removeEventListener('input',itemManualInput);root.remove();
     },

@@ -158,6 +158,7 @@ export function resolveGamePlan(raw, chess, bonds = {}, gameItems = null, diy = 
     const record = itemIndex.records.get(real), base = record?.baseId || real;
     const targetIds = [...new Set([real, base, ...[record,itemIndex.records.get(base)].map(r => r?.goldenId || r?.upgradeChessId).filter(id => typeof id === 'string')])];
     effective.items.push({ id: real, sourceId: item.id, name, limit: item.limit,
+      allowEquippedMerge:real==='chess_item_5_07_e_a' && item.allowEquippedMerge===true,
       ownedTarget: item.ownedTarget ?? null, targetIds, excludeEquipped: real === 'chess_item_6_08_e_a',
       used: stored.itemSession.used[item.id] || 0, minFunds: item.minFunds, merge });
   }
@@ -169,7 +170,7 @@ export function tradePlanKey(raw) {
   // Confirmed purchase counters are not configuration edits. Manual or detected
   // next matches advance epoch and stop a live run before resetting counters.
   return JSON.stringify({buy:p.buy,keep:p.keep,disabled:p.disabled,customOperators:p.customOperators,
-    itemBuyingPaused:p.itemBuyingPaused===true,keepRules:p.keepRules,items:p.items.filter(item=>item.enabled).map(({id,limit,minFunds,ownedTarget})=>({id,limit,minFunds,ownedTarget})),
+    itemBuyingPaused:p.itemBuyingPaused===true,keepRules:p.keepRules,items:p.items.filter(item=>item.enabled).map(({id,limit,minFunds,ownedTarget,allowEquippedMerge})=>({id,limit,minFunds,ownedTarget,allowEquippedMerge})),
     autoUse:p.items.filter(item=>item.autoUse===true).map(item=>item.id),
     epoch:p.itemSession.epoch});
 }
