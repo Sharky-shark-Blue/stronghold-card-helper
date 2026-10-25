@@ -10,13 +10,14 @@
   style.textContent = `
     button{display:flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid #42554c;border-radius:0 9px 9px 0;
       background:linear-gradient(135deg,#1b3028,#111b19);color:#e7f6eb;font:600 11px Microsoft YaHei,sans-serif;
-      box-shadow:0 5px 16px #0006;cursor:pointer;letter-spacing:.1px;min-height:34px;box-sizing:border-box}
+      box-shadow:0 5px 16px #0006;cursor:pointer;letter-spacing:.1px;min-height:34px;box-sizing:border-box;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
     button:hover{border-color:#9bd6ad;background:linear-gradient(135deg,#254737,#15241d)}
     button:focus-visible{outline:2px solid #b9eac5;outline-offset:2px}
     button:disabled{opacity:.7;cursor:wait} img{width:20px;height:20px;object-fit:cover;border-radius:5px}
     .drag{width:14px;padding:0;justify-content:center;border-right:0;border-radius:9px 0 0 9px;
       cursor:grab;touch-action:none;user-select:none;color:#a8c9b1;font-size:15px}
     .drag:active{cursor:grabbing}
+    @media(pointer:coarse),(max-width:600px){button{min-height:40px;padding:8px 10px;font-size:12px}.drag{width:22px;font-size:17px}}
     .hint{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
   `;
   const button = document.createElement('button');

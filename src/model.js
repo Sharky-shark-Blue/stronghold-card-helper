@@ -113,7 +113,7 @@ export function normalizePlan(raw) {
     keepRules,
     // Legacy draft preference only. The real runtime is always disarmed until an explicit UI click.
     draftEnabled: p.draftEnabled === true,
-    width: [360, 400, 440].includes(p.width) ? p.width : 400,
+    width: [280, 320, 360, 400, 440].includes(p.width) ? p.width : 400,
     compact: p.compact === true,
     iconOnly: p.iconOnly === true,
     iconOrder:Object.fromEntries(KINDS.map(kind=>[kind,iconSlots[kind].filter(Boolean)])), iconSlots,

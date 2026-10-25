@@ -56,7 +56,7 @@ try {
       async getBackup(){return (await chrome.storage.local.get(BACKUP_KEY))[BACKUP_KEY] || null;},async setBackup(value){await chrome.storage.local.set({[BACKUP_KEY]:value});}},
     onReadySettingsSaved:settings=>notify('ready.settings',{settings}),
     onPersistenceError:()=>notify('storage.error'),
-    onPlanChange:(plan,meta)=>notify('plan',{plan,liveItemToggle:meta?.liveItemToggle,liveItemPause:meta?.liveItemPause}),onRuntimeAction:request,onQuickOpen:kind=>notify('quick.open',{kind}),onCollapse:()=>notify('collapse'),onClose:()=>notify('close'),onResize:width=>notify('width',{width}),
+    onPlanChange:(plan,meta)=>notify('plan',{plan,liveItemToggle:meta?.liveItemToggle,liveItemPause:meta?.liveItemPause}),onRuntimeAction:request,onQuickOpen:kind=>notify('quick.open',{kind}),onCollapse:()=>notify('collapse'),onClose:()=>notify('close'),onResize:width=>notify('width',{width}),onDockDrag:drag=>notify('dock.drag',{drag}),
   });
   window.weiWorkbench=workbench;
   notify('ui.ready',{plan:workbench.getPlan()});

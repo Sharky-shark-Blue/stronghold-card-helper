@@ -96,7 +96,7 @@ export function createInlineFeedback(node, resolveSlot, {
 }
 
 export async function mountWorkbench(container, options) {
-  const { brandUrl, storage, onCollapse = () => {}, onClose = onCollapse, onResize = () => {} } = options;
+  const { brandUrl, storage, onCollapse = () => {}, onClose = onCollapse, onResize = () => {}, onDockDrag = () => {} } = options;
   let catalogue = options.catalogue;
   let persistenceReady = true;
   let runtimeInfo = {ready:false,running:false,starting:false,message:options.preview?'离线预览 · 不连接对局、不执行交易':'正在连接当前网页；自动交易未启动',matches:{},itemMatches:{},pending:[],entries:[],health:['尚未连接网页接口'],logCount:0};
@@ -186,7 +186,7 @@ export async function mountWorkbench(container, options) {
       <section class="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div class="settings-head"><h2 id="settings-title">工作台设置</h2><button class="icon-button" type="button" data-action="settings-close" aria-label="关闭设置">${icon('close')}</button></div>
         <div class="settings-content">
-        <div class="settings-group"><label>左侧面板宽度</label><div class="width-options">${[360,400,440].map(w => `<button type="button" data-width="${w}" aria-pressed="false">${w} px</button>`).join('')}</div></div>
+        <div class="settings-group"><label>左侧面板宽度</label><div class="width-options">${[280,320,360,400,440].map(w => `<button type="button" data-width="${w}" aria-pressed="false">${w} px</button>`).join('')}</div></div>
         <div class="settings-group density-line"><div><label>紧凑列表</label><p>缩小行距</p></div><button class="switch" type="button" role="switch" data-action="compact" aria-checked="false" aria-label="切换紧凑列表"><span></span></button></div>
         <div class="settings-group density-line"><div><label>仅图标模式</label><p>点击启停，拖动排序</p></div><button class="switch" type="button" role="switch" data-action="icons" aria-checked="false" aria-label="切换仅图标模式"><span></span></button></div>
         <div class="settings-group auto-ready-settings"><div class="density-line"><div><label>自动准备</label><p>无尽用 · 手动开启，重新打开后默认关闭</p></div><button class="switch" type="button" role="switch" data-action="ready-toggle" aria-checked="false" aria-label="自动准备开关"><span></span></button></div>
@@ -444,11 +444,11 @@ export async function mountWorkbench(container, options) {
           <button type="button" class="row-action row-more item-remove" data-action="item-remove" data-id="${esc(item.id)}" aria-label="移除道具 ${esc(name)}" title="移除道具">×</button>
         </div>
       </div><div class="keep-rules" role="group" aria-label="${esc(name)} 每局道具规则">
-        <label class="item-limit-label">持有目标 <input type="number" min="1" max="99" step="1" value="${item.ownedTarget ?? ''}" placeholder="不限" data-item-target="${esc(item.id)}" aria-label="${esc(name)} 实时持有目标"></label>
-        <label class="item-limit-label">抓取上限 <input type="number" min="1" max="99" step="1" value="${item.limit ?? ''}" placeholder="不限" data-item-limit="${esc(item.id)}" aria-label="${esc(name)} 每局抓取上限"></label>
+        <label class="item-limit-label">持有目标 <input type="number" inputmode="numeric" min="1" max="99" step="1" value="${item.ownedTarget ?? ''}" placeholder="不限" data-item-target="${esc(item.id)}" aria-label="${esc(name)} 实时持有目标"></label>
+        <label class="item-limit-label">抓取上限 <input type="number" inputmode="numeric" min="1" max="99" step="1" value="${item.limit ?? ''}" placeholder="不限" data-item-limit="${esc(item.id)}" aria-label="${esc(name)} 每局抓取上限"></label>
         <span class="item-owned-count" data-item-owned="${esc(item.id)}" title="只统计当前仍持有的道具；人事部文档用后的永久效果不计作持有。">本局持有 —</span>
         <div class="item-stepper"><button type="button" data-action="item-minus" data-id="${esc(item.id)}" aria-label="减少 ${esc(name)} 本局已抓次数" ${used <= 0 ? 'disabled' : ''}>−</button><span>已抓 ${used}${item.limit != null ? ` / ${item.limit}` : ''}</span><button type="button" data-action="item-plus" data-id="${esc(item.id)}" aria-label="增加 ${esc(name)} 本局已抓次数" ${used >= (item.limit ?? 9999) ? 'disabled' : ''}>＋</button></div>
-        <label class="item-funds-label">购买前资金 ＞ <input type="number" min="0" max="999999999" step="1" value="${item.minFunds??''}" placeholder="不限" data-item-funds="${esc(item.id)}" aria-label="${esc(name)} 购买前资金必须大于"></label>
+        <label class="item-funds-label">购买前资金 ＞ <input type="number" inputmode="numeric" min="0" max="999999999" step="1" value="${item.minFunds??''}" placeholder="不限" data-item-funds="${esc(item.id)}" aria-label="${esc(name)} 购买前资金必须大于"></label>
         <label class="item-use-label${item.autoUse ? ' is-on' : ''}" title="运行中把手牌/整备区的该道具装备给最近获得的干员（战场优先，其次手牌区）；装备栏满则换下一名，绝不替换已佩戴装备。仅对装备即消耗的道具生效。"><input type="checkbox" data-item-use="${esc(item.id)}" ${item.autoUse ? 'checked' : ''} aria-label="${esc(name)} 自动使用：装备给最近获得的干员"> 自动使用 · 给最近干员</label>
         ${item.id==='chess_item_5_07_e_a'?`<label class="item-use-label${item.allowEquippedMerge?' is-on':''}" title="仅商业包装：允许买入时消耗已装备的普通包装来合成精锐，可能改变装备状态；不会自动装备合成产物，也不放宽其他装备保护。"><input type="checkbox" data-item-equipped-merge="${esc(item.id)}" ${item.allowEquippedMerge?'checked':''}> 允许已装备包装参与合成</label>`:''}
         ${item.autoUse && useNote ? `<span class="item-use-note">${esc(useNote)}</span>` : ''}
@@ -592,9 +592,9 @@ export async function mountWorkbench(container, options) {
           <button type="button" class="row-action row-more" data-action="row-more" data-id="${esc(op.id)}" aria-label="更多操作：${esc(op.name)}" aria-haspopup="menu" aria-expanded="${menuId===op.id}">···</button>
         </div>
       </div>${plan.active==='keep' ? `<div class="keep-rules" role="group" aria-label="${esc(op.name)} 实时保留规则">
-        <label class="item-limit-label">持有目标 <input type="number" min="1" max="99" step="1" value="${plan.keepRules[op.id]?.limit??''}" placeholder="不限" data-keep-limit="${esc(op.id)}" aria-label="${esc(op.name)} 持有目标（普通1，精二3）"></label>
+        <label class="item-limit-label">持有目标 <input type="number" inputmode="numeric" min="1" max="99" step="1" value="${plan.keepRules[op.id]?.limit??''}" placeholder="不限" data-keep-limit="${esc(op.id)}" aria-label="${esc(op.name)} 持有目标（普通1，精二3）"></label>
         <div class="item-stepper"><span data-keep-owned="${esc(op.id)}">持有 —</span></div>
-        <label class="item-funds-label">购买前资金 ＞ <input type="number" min="0" max="999999999" step="1" value="${plan.keepRules[op.id]?.minFunds??''}" placeholder="不限" data-keep-funds="${esc(op.id)}" aria-label="${esc(op.name)} 购买前资金必须大于"></label>
+        <label class="item-funds-label">购买前资金 ＞ <input type="number" inputmode="numeric" min="0" max="999999999" step="1" value="${plan.keepRules[op.id]?.minFunds??''}" placeholder="不限" data-keep-funds="${esc(op.id)}" aria-label="${esc(op.name)} 购买前资金必须大于"></label>
       </div>`:''}`;renderIconList(rows,rowKey,()=>visible.length ? (plan.iconOnly ? iconGridMarkup(plan.iconSlots[plan.active],visible,operatorMarkup,Model.MAX_ICON_GRID_CELLS) : visible.map(operatorMarkup).join('')) : !plan[plan.active].length
       ? `<div class="empty">${icon('plus')}<strong>还没有添加干员</strong><span>点击“新增”，单击候选干员即可添加。<br>常态仅显示你已添加的名单。</span><button class="new-button" type="button" data-action="add-open">${icon('plus')}新增干员</button></div>`
       : `<div class="empty">${icon('search')}<strong>没有符合条件的已添加项</strong><span>试试其他名称、阶级或盟约，<br>或关闭“只看启用”以查看禁用项。</span><button class="text-button" type="button" data-action="reset-filter">重置筛选</button></div>`);}
@@ -1255,7 +1255,15 @@ export async function mountWorkbench(container, options) {
   const readyFundsChange=()=>{const value=$('#ready-funds').value.trim(),funds=value===''?null:Number(value);
     if($('#ready-funds').validity.badInput || funds!==null && (!Number.isSafeInteger(funds)||funds<0)){toast('资金上限请输入非负整数，留空表示不限');$('#ready-funds').value=plan.autoReady.funds===null?'':String(plan.autoReady.funds);return;}
     change({...plan,autoReady:{...plan.autoReady,funds}});};
+  const syncMenus=()=>{if(menuId)renderEntryMenu();if(!$('#bulk-menu').hidden)positionMenu($('#bulk-menu'),$('[data-action=bulk-more]'));};
+  const brand=$('.brand');let dockDrag=null;
+  const inFrame=window!==window.parent && !options.preview;
+  const brandDown=e=>{if(e.button!==0||e.target.closest('button,a,input,select'))return;e.preventDefault();const useScr=inFrame&&(e.screenX!==0||e.screenY!==0);dockDrag={id:e.pointerId,x:useScr?e.screenX:e.clientX,y:useScr?e.screenY:e.clientY,useScr,moved:false};brand.setPointerCapture?.(e.pointerId);};
+  const brandMove=e=>{if(!dockDrag||dockDrag.id!==e.pointerId)return;const cx=dockDrag.useScr?e.screenX:e.clientX,cy=dockDrag.useScr?e.screenY:e.clientY,ox=cx-dockDrag.x,oy=cy-dockDrag.y;if(!dockDrag.moved&&Math.hypot(ox,oy)<4)return;if(!dockDrag.moved){dockDrag.moved=true;root.classList.add('is-dock-dragging');onDockDrag({phase:'start'});}e.preventDefault();onDockDrag({phase:'move',ox,oy});};
+  const brandUp=e=>{if(!dockDrag||dockDrag.id!==e.pointerId)return;const moved=dockDrag.moved,id=dockDrag.id;dockDrag=null;root.classList.remove('is-dock-dragging');if(brand.hasPointerCapture?.(id))brand.releasePointerCapture(id);if(moved)onDockDrag({phase:'end'});};
+  brand.addEventListener('pointerdown',brandDown);brand.addEventListener('pointermove',brandMove);brand.addEventListener('pointerup',brandUp);brand.addEventListener('pointercancel',brandUp);brand.addEventListener('lostpointercapture',brandUp);
   $('#ready-funds').addEventListener('change',readyFundsChange);
+  list.addEventListener('scroll',syncMenus,{passive:true}); window.addEventListener('resize',syncMenus);
   root.addEventListener('click', click); root.addEventListener('keydown', keydown); root.addEventListener('contextmenu', contextmenu); root.addEventListener('change',itemChange);
   root.addEventListener('load', gameIconLoad, true); root.addEventListener('error', gameIconError, true);
   root.addEventListener('pointerdown', iconPointerDown);
@@ -1341,7 +1349,9 @@ export async function mountWorkbench(container, options) {
       destroyed = true; feedback.destroy();
       finishIconDrag();
       document.removeEventListener('click',outsideClick); document.removeEventListener('keydown',documentHotkey,true);
+      brand.removeEventListener('pointerdown',brandDown);brand.removeEventListener('pointermove',brandMove);brand.removeEventListener('pointerup',brandUp);brand.removeEventListener('pointercancel',brandUp);brand.removeEventListener('lostpointercapture',brandUp);
       $('#ready-funds').removeEventListener('change',readyFundsChange);
+      list.removeEventListener('scroll',syncMenus); window.removeEventListener('resize',syncMenus);
       root.removeEventListener('click', click); root.removeEventListener('keydown', keydown); root.removeEventListener('contextmenu', contextmenu); root.removeEventListener('change',itemChange);
       root.removeEventListener('load', gameIconLoad, true); root.removeEventListener('error', gameIconError, true);
       root.removeEventListener('pointerdown', iconPointerDown);

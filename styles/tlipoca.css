@@ -98,3 +98,4 @@
 .preview .preview-bar img{content:var(--tlipoca-avatar);border-radius:50%}
 .preview .preview-foot{margin-top:auto;background:#150a17a6;border-color:#f3b3cb24;color:#e4c4d3;font-family:inherit;letter-spacing:.03em;font-size:10px}
 @media(max-height:700px){.workbench.workflow .brand{height:60px;padding-top:9px;padding-bottom:9px}.workbench.workflow .brand-avatar{width:36px;height:36px}.workbench.workflow .main{gap:7px;padding-top:9px}.workbench.workflow .context{min-height:26px}}
+@media(max-height:560px){.workbench.workflow .brand{height:40px;min-height:40px;padding-top:4px;padding-bottom:4px}.workbench.workflow .brand-avatar{width:26px;height:26px}.workbench.workflow .main{gap:5px;padding-top:6px;padding-bottom:6px}}

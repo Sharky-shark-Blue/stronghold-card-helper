@@ -435,6 +435,87 @@
 .workbench.workflow .config-actions .tool-button svg{width:14px;height:14px}
 .workbench.workflow .config-restore{align-self:flex-start;padding:0;color:var(--v-list);font-size:11px}
 /* Keep settings feedback and its close button outside the scrolling content. */
-.workbench.workflow .settings{display:flex;flex-direction:column;max-height:calc(100vh - 32px);overflow:hidden}
+.workbench.workflow .settings{display:flex;flex-direction:column;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:hidden}
 .workbench.workflow .settings-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1}
 .workbench.workflow .settings-backdrop{padding:16px}
+/* 移动端安全区、触控热区与窄屏适配 */
+.workbench.workflow .brand{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));cursor:grab;user-select:none;touch-action:none}
+.workbench.workflow .brand-avatar,.workbench.workflow .brand-text{pointer-events:none;-webkit-user-drag:none;user-select:none}
+.workbench.workflow.is-dock-dragging .brand{cursor:grabbing}
+.preview.is-collapsed #app[data-side=right]{transform:translateX(104%)}
+.preview .launcher{cursor:grab;user-select:none;touch-action:none}
+.preview .launcher:active{cursor:grabbing}
+.preview .launcher img,.preview .launcher span{pointer-events:none;-webkit-user-drag:none}
+.preview .launcher[data-side=right]{border-left:1px solid #2a3442;border-right:0;border-radius:12px 0 0 12px;box-shadow:-6px 8px 24px #0007}
+.workbench.workflow .main{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.workbench.workflow .footer{padding-bottom:max(8px,env(safe-area-inset-bottom,0px));padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.workbench.workflow .utility-head{padding-top:max(10px,env(safe-area-inset-top,0px));padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+.workbench.workflow .utility-foot{padding-bottom:max(10px,env(safe-area-inset-bottom,0px));padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+.workbench.workflow .operator-list,.workbench.workflow .item-scroll,.workbench.workflow .picker-list,.workbench.workflow .settings-content,.workbench.workflow .utility-content,.workbench.workflow .log-list{-webkit-overflow-scrolling:touch}
+@media(hover:none) and (pointer:coarse){.workbench.workflow .search kbd,.workbench.workflow .hotkey-chip{display:none!important}}
+@media(pointer:coarse){
+  .workbench.workflow .icon-button{width:34px;height:34px}
+  .workbench.workflow .density-toggle{min-height:26px;height:26px;padding:0 10px;font-size:11px}
+  .workbench.workflow .row-power{min-height:32px;height:32px;padding:0 10px 0 21px}
+  .workbench.workflow .row-lock,.workbench.workflow .row-more,.workbench.workflow .item-remove{width:32px;height:32px}
+  .workbench.workflow .item-stepper{height:30px}
+  .workbench.workflow .item-stepper button{width:28px;height:28px;font-size:16px}
+  .workbench.workflow .item-limit-label input,.workbench.workflow .item-funds-label input,.workbench.workflow .item-use-label{height:30px}
+  .workbench.workflow .search-clear{width:28px;height:28px;font-size:16px}
+  .workbench.workflow .picker .tier-button{min-height:30px;padding:6px 4px}
+}
+@media(max-width:480px){
+  .workbench.workflow{border-right:0}
+  .workbench.workflow .settings-backdrop,.workbench.workflow .picker-backdrop{padding:max(8px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+  .workbench.workflow .settings,.workbench.workflow .picker{max-height:calc(100dvh - 16px)}
+}
+/* 手机横屏与超矮视口（如高度 <= 560px）：整栏可纵向滚动，主列表永不被底栏挤压消失 */
+@media(max-height:560px){
+  .workbench.workflow{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .workbench.workflow:has(>.picker-backdrop:not([hidden]),>.settings-backdrop:not([hidden]),>.utility-backdrop:not([hidden])){overflow:hidden}
+  .workbench.workflow .brand{position:sticky;top:0;z-index:20;height:40px;min-height:40px;padding:4px max(10px,env(safe-area-inset-right,0px)) 4px max(10px,env(safe-area-inset-left,0px));gap:8px;backdrop-filter:blur(12px)}
+  .workbench.workflow .brand-avatar{width:26px;height:26px}
+  .workbench.workflow .brand-text strong{font-size:13px}
+  .workbench.workflow .icon-button{width:28px;height:28px}
+  .workbench.workflow .context,.workbench.workflow .save-status{display:none!important}
+  .workbench.workflow .main{flex:1 0 auto;min-height:0;overflow:visible;padding:6px max(10px,env(safe-area-inset-right,0px)) 6px max(10px,env(safe-area-inset-left,0px));gap:5px}
+  .workbench.workflow .tabs{min-height:34px;padding:2px}
+  .workbench.workflow .tab{min-height:28px;font-size:11.5px;padding:0 6px;gap:4px}
+  .workbench.workflow .tab-character{width:18px;height:18px}
+  .workbench.workflow .primary-add,.workbench.workflow .plan-toolbar>.tool-button,.workbench.workflow .plan-toolbar>.icon-button{min-height:32px;height:32px;font-size:11.5px}
+  .workbench.workflow .search{min-height:32px;height:32px}
+  .workbench.workflow .list-heading{min-height:20px;font-size:10.5px}
+  .workbench.workflow .operator-list{flex:none;min-height:135px;max-height:210px}
+  .workbench.workflow .item-panel{flex:none;min-height:150px}
+  .workbench.workflow .item-scroll{flex:none;min-height:135px;max-height:210px}
+  .workbench.workflow .operator-list .empty,.workbench.workflow .item-scroll .empty{min-height:115px;padding:12px 10px;gap:6px}
+  .workbench.workflow .footer{padding:6px max(10px,env(safe-area-inset-right,0px)) max(6px,env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));gap:5px}
+  .workbench.workflow .auto-card{padding:6px 10px;border-radius:9px}
+  .workbench.workflow .auto-icon{width:24px;height:24px}
+  .workbench.workflow .auto-title strong{font-size:11.5px}
+  .workbench.workflow .run-button{min-height:28px;height:28px;min-width:58px;padding:0 12px;font-size:11.5px;border-radius:7px}
+  .workbench.workflow .auto-card>.feedback-slot{grid-template-rows:16px;block-size:16px;min-block-size:16px;margin-top:2px}
+  .workbench.workflow .auto-card #draft-note,.workbench.workflow .auto-card .feedback-slot>*{font-size:10px;line-height:16px;max-height:16px;-webkit-line-clamp:1}
+  .workbench.workflow .utility-bar{margin-top:4px;gap:6px}
+  .workbench.workflow .utility-button{min-height:26px;height:26px;font-size:10px;padding:0 8px}
+  .workbench.workflow .picker-backdrop,.workbench.workflow .settings-backdrop,.workbench.workflow .utility-backdrop{position:fixed;inset:0;padding:max(4px,env(safe-area-inset-top,0px)) max(6px,env(safe-area-inset-right,0px)) max(4px,env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
+  .workbench.workflow .picker,.workbench.workflow .settings{max-height:calc(100dvh - 8px);border-radius:10px}
+  .workbench.workflow .picker{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .workbench.workflow .picker-head{padding:6px 10px}
+  .workbench.workflow .picker-head h2,.workbench.workflow .settings-head h2,.workbench.workflow .utility-head h2{font-size:13.5px;margin:0}
+  .workbench.workflow .picker-head p,.workbench.workflow .picker-footer p,.workbench.workflow .sheet-hint{display:none}
+  .workbench.workflow .picker-filters{padding:6px 10px 0;gap:4px}
+  .workbench.workflow .picker-filters .search,.workbench.workflow .picker-filters .bond-filter{min-height:28px;height:28px}
+  .workbench.workflow .picker .tier-button{min-height:24px;padding:3px 2px;font-size:9.5px}
+  .workbench.workflow .picker-meta{padding:3px 10px;font-size:10px}
+  .workbench.workflow .picker-list{flex:1 0 auto;min-height:120px;max-height:190px;margin:0 8px}
+  .workbench.workflow .manual-details{margin:4px 8px 0}
+  .workbench.workflow .manual-details>summary{padding:5px 9px;font-size:10.5px}
+  .workbench.workflow .picker-footer{padding:6px 10px;margin-top:4px;justify-content:flex-end}
+  .workbench.workflow .settings-head{padding:8px 12px}
+  .workbench.workflow .settings-content{padding:8px 12px;gap:8px}
+  .workbench.workflow .settings-done{margin:6px 12px 8px;min-height:32px;height:32px;font-size:11.5px}
+  .workbench.workflow .utility-head{padding:6px 10px;min-height:36px}
+  .workbench.workflow .utility-content{padding:8px 10px;gap:6px}
+  .workbench.workflow .utility-foot{padding:6px 10px}
+}

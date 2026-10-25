@@ -72,3 +72,5 @@
 .workflow .hotkey-controls .text-button:disabled{opacity:.4;cursor:default}
 .workflow .hotkey-error{flex-basis:100%;margin:0;padding:6px 8px;border:1px solid #7a4b3a;border-radius:6px;background:#3a241d;color:#f3c1a8;font-size:10px;line-height:1.5}
 .workflow .hotkey-chip{margin-left:auto;padding:1px 6px;border:1px solid #53674d;border-bottom-width:2px;border-radius:5px;color:#a7b99e;font:600 9px Consolas,monospace}
+@media(max-height:540px){.workflow .item-panel,.workflow .item-scroll{min-height:130px}}
+@media(max-width:420px){.workflow .filter-line{flex-wrap:wrap}.workflow .selected-only{margin-left:auto}.workflow .log-actions{flex-wrap:wrap}.workflow .keep-rules{gap:6px}.workflow .item-funds-label{flex-wrap:wrap}}

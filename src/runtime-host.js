@@ -25,7 +25,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
   host.style.cssText = 'all:initial;position:fixed;left:0;top:0;bottom:0;z-index:2147483646;width:400px;pointer-events:none;';
   const shadow = host.attachShadow({ mode: 'closed' });
   const style = document.createElement('style');
-  style.textContent = ':host{color-scheme:dark}iframe{display:block;width:100%;height:100%;border:0;pointer-events:auto;box-shadow:12px 0 40px #0005}.reopen{position:absolute;left:0;top:42%;display:flex;flex-direction:column;align-items:center;gap:8px;width:43px;padding:10px 6px;border:1px solid #2a3442;border-left:0;border-radius:0 12px 12px 0;background:linear-gradient(180deg,#1b2330,#10151c);color:#e7edf4;box-shadow:6px 8px 24px #0007;cursor:pointer;pointer-events:auto}.reopen:focus-visible{outline:2px solid #b9eac5;outline-offset:3px}.reopen img{width:28px;height:28px;object-fit:cover;border-radius:7px}.reopen span{font:10px Microsoft YaHei,sans-serif;writing-mode:vertical-rl;letter-spacing:2px}[hidden]{display:none!important}';
+  style.textContent = ':host{color-scheme:dark}iframe{display:block;width:100%;height:100%;border:0;pointer-events:auto;box-shadow:12px 0 40px #0005}:host([data-side=right]) iframe{box-shadow:-12px 0 40px #0005}.reopen{position:fixed;left:0;top:42%;z-index:2147483647;display:flex;flex-direction:column;align-items:center;gap:8px;width:43px;padding:10px 6px 10px max(6px,env(safe-area-inset-left,0px));border:1px solid #2a3442;border-left:0;border-radius:0 12px 12px 0;background:linear-gradient(180deg,#1b2330,#10151c);color:#e7edf4;box-shadow:6px 8px 24px #0007;cursor:grab;pointer-events:auto;touch-action:none;user-select:none;-webkit-tap-highlight-color:transparent}.reopen:active{cursor:grabbing}:host([data-side=right]) .reopen{padding:10px max(6px,env(safe-area-inset-right,0px)) 10px 6px;border-left:1px solid #2a3442;border-right:0;border-radius:12px 0 0 12px;box-shadow:-6px 8px 24px #0007}.reopen:focus-visible{outline:2px solid #b9eac5;outline-offset:3px}.reopen img{width:28px;height:28px;object-fit:cover;border-radius:7px;pointer-events:none;-webkit-user-drag:none}.reopen span{font:10px Microsoft YaHei,sans-serif;writing-mode:vertical-rl;letter-spacing:2px;pointer-events:none}@media(pointer:coarse),(max-width:600px){.reopen{width:46px;min-height:86px;padding:12px 7px 12px max(7px,env(safe-area-inset-left,0px))}}[hidden]{display:none!important}';
   const frame = document.createElement('iframe'); frame.title = '卫戍协议拿牌器 · 左侧工作台';
   const token = cfg.uiToken;
   if(typeof token!=='string' || !/^[a-f0-9]{32}$/.test(token))return;
@@ -33,11 +33,11 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
   url.hash = new URLSearchParams({ token }).toString(); frame.src = url.href;
   const extensionOrigin = `${url.protocol}//${url.host}`;
   const reopen = document.createElement('button'); reopen.className='reopen'; reopen.type = 'button'; reopen.setAttribute('aria-label', '展开卫戍协议拿牌器'); reopen.hidden = true;
-  const avatar = document.createElement('img'); avatar.src = QUICK_CHIBI_ICON; avatar.alt = '';
+  const avatar = document.createElement('img'); avatar.src = QUICK_CHIBI_ICON; avatar.alt = ''; avatar.draggable = false;
   const label = document.createElement('span'); label.textContent = '工作台';
   reopen.append(avatar, label); shadow.append(style, frame, reopen); document.documentElement.append(host);
   const layout = document.createElement('style'); layout.dataset.weiLayout = 'v1'; document.documentElement.append(layout);
-  let expanded = true, width = 400, closed = false, uiReady = false;
+  let expanded = true, width = 400, dockSide = 'left', dockX = 0, dockStartX = 0, reopenY = null, reopenDrag = null, ignoreReopenClickUntil = 0, closed = false, uiReady = false;
   let plan = Model.normalizePlan(null), chess = null, bonds = {}, garrisons = null, gameItems = null, catalogue = null, diyNames = null, diyOperators = null, diyLabelKey = '';
   let gameIcons = createGameIconIndex(null, cfg.root), iconRevision = 0, iconRequest = null, iconView = null;
   let transport = null, controller = null, auditLog = null, auditReady = false, healthError = '';
@@ -152,15 +152,32 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
     const runtime=info();quickDock.update(quickState(runtime));
     post('runtime', {info:{...runtime,...(includeCatalogue || changed ? {itemShelf: itemShelf()} : {})},...((includeCatalogue || changed) && view ? {catalogue: view.catalogue} : {})});
   }
+  function hostWidth() {
+    return Math.min(width, Math.max(240, innerWidth));
+  }
+  function placeReopen() {
+    const rw = reopen.offsetWidth || 44, rh = reopen.offsetHeight || 86;
+    const rx = dockSide === 'right' ? Math.max(0, innerWidth - rw) : 0;
+    const ry = Math.max(8, Math.min(Math.max(8, innerHeight - rh - 8), reopenY ?? Math.round(innerHeight * 0.42)));
+    reopen.style.left = `${rx}px`; reopen.style.right = 'auto'; reopen.style.top = `${ry}px`;
+  }
   function update() {
-    const actual = Math.min(width, Math.max(260, innerWidth - 20)); host.style.width = `${actual}px`;
+    const actual = hostWidth(); host.style.width = `${actual}px`;
+    dockX = dockSide === 'right' ? Math.max(0, innerWidth - actual) : 0;
+    host.dataset.side = dockSide; host.style.left = `${dockX}px`; host.style.top = '0px'; host.style.bottom = '0px';
     frame.hidden = !expanded; reopen.hidden = expanded;
-    layout.textContent = expanded ? `.app-root{left:${actual}px!important;right:0!important}#boot{left:${actual}px!important}` : '';
+    placeReopen();
+    const push = expanded && innerWidth > 768 && innerHeight > 560;
+    layout.textContent = push ? (dockSide === 'right' ? `.app-root{left:0!important;right:${actual}px!important}#boot{right:${actual}px!important}` : `.app-root{left:${actual}px!important;right:0!important}#boot{left:${actual}px!important}`) : '';
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
   function onResize() {
-    const actual = Math.min(width, Math.max(260, innerWidth - 20)); host.style.width = `${actual}px`;
-    layout.textContent = expanded ? `.app-root{left:${actual}px!important;right:0!important}#boot{left:${actual}px!important}` : '';
+    const actual = hostWidth(); host.style.width = `${actual}px`;
+    dockX = dockSide === 'right' ? Math.max(0, innerWidth - actual) : 0;
+    host.dataset.side = dockSide; host.style.left = `${dockX}px`; host.style.top = '0px'; host.style.bottom = '0px';
+    placeReopen();
+    const push = expanded && innerWidth > 768 && innerHeight > 560;
+    layout.textContent = push ? (dockSide === 'right' ? `.app-root{left:0!important;right:${actual}px!important}#boot{right:${actual}px!important}` : `.app-root{left:${actual}px!important;right:0!important}#boot{left:${actual}px!important}`) : '';
   }
   function close() {
     if (closed) return;
@@ -207,6 +224,7 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
     const changed = tradePlanKey(plan) !== tradePlanKey(next);
     // Settings are hot-swappable. Only game identity/state, storage or transaction evidence can stop a run.
     const previous = plan; plan = next;
+    if (next.width !== width) { width = next.width; update(); }
     controller?.updatePlan();
     if (changed && auditReady && recordChanges) {
       for (const kind of ['buy','keep']) {
@@ -327,7 +345,21 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
     }
     if (data.type === 'collapse') { expanded = false; update(); return; }
     if (data.type === 'close') {close();return;}
-    if (data.type === 'width' && [360,400,440].includes(data.width)) {width=data.width;update();return;}
+    if (data.type === 'width' && [280,320,360,400,440].includes(data.width)) {width=data.width;update();return;}
+    if (data.type === 'dock.drag' && data.drag && typeof data.drag === 'object') {
+      const actual = hostWidth(), d = data.drag;
+      if (d.phase === 'start') { dockStartX = dockX; host.style.transition = 'none'; return; }
+      if (d.phase === 'move') {
+        const minX = -Math.round(actual * 0.25), maxX = Math.max(0, innerWidth - actual) + Math.round(actual * 0.25);
+        dockX = Math.max(minX, Math.min(maxX, dockStartX + (Number(d.ox) || 0)));
+        host.style.left = `${dockX}px`; host.style.top = '0px'; host.style.bottom = '0px'; return;
+      }
+      if (d.phase === 'end') {
+        dockSide = (dockX + actual / 2) > innerWidth / 2 ? 'right' : 'left';
+        host.style.transition = 'left .22s cubic-bezier(.2,.8,.25,1)';
+        update(); return;
+      }
+    }
     if (['auto.toggle','ready.toggle','ready.stop','health.check','log.read','log.export','log.clear'].includes(data.type) && typeof data.rid==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(data.rid)) {
       void action(data.type).then(result=>post('reply',{rid:data.rid,...result}),error=>{if(data.type==='auto.toggle') {live={...live,state:'blocked',message:error.message};emit();}post('reply',{rid:data.rid,ok:false,reason:error.message});});
     }
@@ -379,7 +411,39 @@ import { createGameIconIndex, operatorGameIcon, itemGameIcon } from './engine/ga
       emit(true);
     } catch(error) {healthError=String(error.message || error).slice(0,200);live={...live,state:'blocked',message:`未启用交易接口：${healthError}`};emit();}
   }
-  reopen.addEventListener('click', () => { expanded = true; update(); }); host.addEventListener('wei:toggle', () => { expanded = !expanded; update(); }); host.addEventListener('wei:dispose', () => { if (!controller?.running && !controller?.starting) close(); });
+  const reopenDown = e => {
+    if (e.button !== 0 || !e.isTrusted) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = reopen.getBoundingClientRect();
+    reopenDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: r.left, top: r.top, w: r.width || 44, h: r.height || 86, curX: r.left, moved: false };
+    reopen.style.transition = 'none';
+    reopen.setPointerCapture?.(e.pointerId);
+  };
+  const reopenMove = e => {
+    if (!reopenDrag || reopenDrag.id !== e.pointerId) return;
+    const dx = e.clientX - reopenDrag.x, dy = e.clientY - reopenDrag.y;
+    if (!reopenDrag.moved && Math.hypot(dx, dy) < 4) return;
+    reopenDrag.moved = true;
+    e.preventDefault(); e.stopPropagation();
+    const curX = Math.max(0, Math.min(innerWidth - reopenDrag.w, reopenDrag.left + dx));
+    const curY = Math.max(8, Math.min(innerHeight - reopenDrag.h - 8, reopenDrag.top + dy));
+    reopenDrag.curX = curX; reopenY = curY;
+    reopen.style.left = `${curX}px`; reopen.style.right = 'auto'; reopen.style.top = `${curY}px`;
+  };
+  const reopenUp = e => {
+    if (!reopenDrag || reopenDrag.id !== e.pointerId) return;
+    const st = reopenDrag; reopenDrag = null;
+    if (reopen.hasPointerCapture?.(st.id)) reopen.releasePointerCapture(st.id);
+    if (!st.moved) return;
+    ignoreReopenClickUntil = Date.now() + 300;
+    dockSide = (st.curX + st.w / 2) > innerWidth / 2 ? 'right' : 'left';
+    reopen.style.transition = 'left .2s cubic-bezier(.2,.8,.25,1),top .2s cubic-bezier(.2,.8,.25,1)';
+    update();
+  };
+  reopen.addEventListener('pointerdown', reopenDown); reopen.addEventListener('pointermove', reopenMove);
+  reopen.addEventListener('pointerup', reopenUp); reopen.addEventListener('pointercancel', reopenUp); reopen.addEventListener('lostpointercapture', reopenUp);
+  reopen.addEventListener('click', e => { if (Date.now() < ignoreReopenClickUntil) { e.preventDefault(); e.stopPropagation(); return; } expanded = true; update(); });
+  host.addEventListener('wei:toggle', () => { expanded = !expanded; update(); }); host.addEventListener('wei:dispose', () => { if (!controller?.running && !controller?.starting) close(); });
   window.addEventListener('message', onMessage);window.addEventListener('resize', onResize);window.addEventListener('pagehide', close);
   window.addEventListener('keydown', onHotkey, true);
   update();void init();
